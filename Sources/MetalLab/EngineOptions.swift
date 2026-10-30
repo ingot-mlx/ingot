@@ -8,7 +8,8 @@ import Foundation
 /// (per-model enablement table):
 /// - copy-from-context: on for MoE with a drafter and without one (LFM2.5), off for dense models with a drafter;
 /// - verification rows from drafter confidence if the family has a calibration (`SpecRowsConfig.load`; today the Qwen3.6
-///   MoE models, Flash-Next and Gemma 4 26B-A4B with its v1 drafter) and 8 fixed otherwise (the 27B);
+///   MoE models, Flash-Next, and Gemma 4 26B-A4B and gpt-oss 20b with their v1 drafters) and 8 fixed otherwise (the
+///   27B);
 /// - GDN checkpoint inside the prefill pass in all that support it (not LFM2);
 /// - 12-row draft tree on dense models with DFlash2, in greedy and with prompts of < 16K;
 /// - exact prefill, except in `lab serve` with a MoE (`EngineOptions.serve(moe:)`: W8A8 from the family's position,

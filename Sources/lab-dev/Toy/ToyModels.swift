@@ -36,10 +36,12 @@ enum ToyArch: String, CaseIterable {
         case .lfm3: "lfm3"
         }
     }
-    /// Without a drafter: LFM2.5, toy-granite, toy-gptoss, toy-nemotron, toy-glm and toy-lfm3 (their families have none
-    /// in the engine). toy-gemma4's is a DFlash v1 like z-lab's for the 26B-A4B (writeToyDrafterV1). The
-    /// drafter is written after the weights with its own seed, so the toy's weights do not depend on it.
-    var hasDrafter: Bool { ![.lfm, .granite, .gptOss, .nemotron, .glm, .lfm3].contains(self) }
+    /// Without a drafter: LFM2.5, toy-granite, toy-nemotron, toy-glm and toy-lfm3 (their families have none in the
+    /// engine). toy-gemma4's is a DFlash v1 like z-lab's for the 26B-A4B (writeToyDrafterV1) and toy-gptoss's one like
+    /// z-lab's for gpt-oss 20b (writeToyDrafterGptOss: heads of 64 with biases and YaRN; gpt-oss runs without a drafter
+    /// by default, so lab-dev gen takes it with --drafter). The drafter is written after the weights with its own seed,
+    /// so the toy's weights do not depend on it.
+    var hasDrafter: Bool { ![.lfm, .granite, .nemotron, .glm, .lfm3].contains(self) }
 }
 
 /// Generator constants; the cuts against the real model are in LabBench (`ToyCut`, Sources/LabBench/ToyConfig.swift).
@@ -126,6 +128,8 @@ struct ToySpec {
             let dr = dir.appendingPathComponent("drafter")
             if arch == .gemma4 {
                 try writeToyDrafterV1(dr, hidden: d.hidden, seed: seed)
+            } else if arch == .gptOss {
+                try writeToyDrafterGptOss(dr, d, seed: seed)
             } else {
                 try writeToyDrafter(dr, arch: arch, hidden: d.hidden, seed: seed, dflash: museKeys)
             }
@@ -395,4 +399,58 @@ private func writeToyDrafterV1(_ dir: URL, hidden H: Int, seed: UInt64) throws {
             "rms_norm_eps": 1e-6, "rope_theta": 1_000_000, "sliding_window": 2048, "tie_word_embeddings": false,
             "use_sliding_window": true, "vocab_size": ToySpec.vocab,
         ], dir.appendingPathComponent("config.json"))
+}
+
+/// DFlash v1 drafter as z-lab's `gpt-oss-20b-DFlash` (bf16; quantized to 4 bits on load): qwen3 layers with 64/8 heads
+/// of 64, q/k/v/o biases (added before q/k_norm), q_norm/k_norm of 64 and the big model's YaRN RoPE (`rope_scaling`
+/// and `rope_theta` of gpt-oss-20b's config, `truncate: false`), no dynamic conv nor selector (argmax drafts, block 8 as
+/// the real root `block_size`), and the toy's 8-bit lm_head, which the engine requantizes to 4 bits for the drafts
+/// (`draftHead`). It covers the `_h64` kernel instances, `dbias_add` and the RoPE table, which no other toy reaches.
+/// Declared difference with the real one (all 8 layers `full_attention`, the engine's 8192 ring): 2 layers, sliding
+/// then full, so the 2048 ring of the first wraps on the 4K prompt and the second takes the 8192 one; context of the
+/// toy's 4 layers (the real one reads 5 of 24) and intermediate 8/3 × hidden as the real 7680/2880.
+private func writeToyDrafterGptOss(_ dir: URL, _ d: ToyDims, seed: UInt64) throws {
+    let H = d.hidden, inter = 8 * H / 3, layerTypes = ["sliding_attention", "full_attention"]
+    let hd = 64, qh = 64, kvh = 8, qd = qh * hd, kvd = kvh * hd
+    let targets = Array(0..<ToySpec.layers)
+    let st = ToySafetensors(seed: seed ^ 0xD64B)
+    func w(_ n: String, _ rows: Int, _ cols: Int, gain: Float = 2) {
+        let sd = gain / Float(cols).squareRoot()
+        st.float(n, .bf16, [rows, cols]) { sd * $0.normal() }
+    }
+    func vec(_ n: String, _ len: Int, _ sd: Float) { st.float(n, .bf16, [len]) { sd * $0.normal() } }
+    w("fc.weight", H, targets.count * H)
+    st.float("hidden_norm.weight", .bf16, [H], mlxNorm(1, 0.02))
+    st.float("norm.weight", .bf16, [H], mlxNorm(1.5, 0.1))
+    for i in layerTypes.indices {
+        let p = "layers.\(i).", a = p + "self_attn."
+        st.float(p + "input_layernorm.weight", .bf16, [H], mlxNorm(0.95, 0.03))
+        st.float(p + "post_attention_layernorm.weight", .bf16, [H], mlxNorm(1, 0.02))
+        w(p + "mlp.gate_proj.weight", inter, H)
+        w(p + "mlp.up_proj.weight", inter, H)
+        w(p + "mlp.down_proj.weight", H, inter)
+        st.float(a + "q_norm.weight", .bf16, [hd], mlxNorm(1.1, 0.07))
+        st.float(a + "k_norm.weight", .bf16, [hd], mlxNorm(1.1, 0.07))
+        w(a + "q_proj.weight", qd, H)
+        w(a + "k_proj.weight", kvd, H)
+        w(a + "v_proj.weight", kvd, H)
+        w(a + "o_proj.weight", H, qd)
+        // Biases as toy-gptoss's: q and k of 0.5 (q/k_norm comes after them), v small, o of 0.5.
+        vec(a + "q_proj.bias", qd, 0.5)
+        vec(a + "k_proj.bias", kvd, 0.5)
+        vec(a + "v_proj.bias", kvd, 0.05)
+        vec(a + "o_proj.bias", H, 0.5)
+    }
+    try st.write(to: dir.appendingPathComponent("model.safetensors"))
+    var c: [String: Any] = [
+        "architectures": ["DFlashDraftModel"], "model_type": "qwen3", "attention_bias": true, "block_size": 8,
+        "dflash_config": ["mask_token_id": ToySpec.tok(248_077), "target_layer_ids": targets] as [String: Any],
+        "eos_token_id": ToySpec.tok(248_046), "head_dim": hd, "hidden_act": "silu", "hidden_size": H,
+        "intermediate_size": inter, "layer_types": layerTypes, "max_position_embeddings": 131072,
+        "max_window_layers": layerTypes.count, "num_attention_heads": qh, "num_hidden_layers": layerTypes.count,
+        "num_key_value_heads": kvh, "num_target_layers": ToySpec.layers, "rms_norm_eps": 1e-5,
+        "sliding_window": 2048, "tie_word_embeddings": false, "use_sliding_window": true, "vocab_size": ToySpec.vocab,
+    ]
+    for k in ["rope_scaling", "rope_theta"] { c[k] = d.real.json[k] }
+    try writeJSON(c, dir.appendingPathComponent("config.json"))
 }

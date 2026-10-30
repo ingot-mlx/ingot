@@ -12,8 +12,9 @@ extension DFlash2Drafter {
 
     /// Why the drafter with config `config` (its config.json) does not fit a model with `hidden` and `layers`, or nil if
     /// it fits: hidden size, target layers inside the model, `num_target_layers` (if present) equal to the model's
-    /// layers, and the shape the kernels support (32 q / 8 KV heads of 128; with `v1` known, the DFlash2 block, window,
-    /// conv and selector). `layers` nil skips the layer checks; `v1` nil skips the DFlash2 shape check.
+    /// layers, and the shape the kernels support (32 q / 8 KV heads of 128, or 64/8 of 64 with optional attention
+    /// biases and YaRN; with `v1` known, the DFlash2 block, window, conv and selector). `layers` nil skips the layer
+    /// checks; `v1` nil skips the DFlash2 shape check.
     public static func mismatch(config cj: [String: Any], hidden: Int, layers: Int?, v1: Bool?) -> String? {
         func int(_ d: [String: Any]?, _ k: String) -> Int? { (d?[k] as? NSNumber)?.intValue }
         let dc = cj["dflash_config"] as? [String: Any]
@@ -27,12 +28,21 @@ extension DFlash2Drafter {
             }
             if let n = int(cj, "num_target_layers"), n != layers { return "num_target_layers \(n) vs \(layers)" }
         }
-        if int(cj, "head_dim") ?? 128 != 128 || int(cj, "num_attention_heads") != 32
-            || int(cj, "num_key_value_heads") != 8
-        {
-            return "heads \(int(cj, "num_attention_heads") ?? 0)/\(int(cj, "num_key_value_heads") ?? 0) of "
-                + "\(int(cj, "head_dim") ?? 128) (32/8 of 128 supported)"
+        let hd = int(cj, "head_dim") ?? 128, qh = int(cj, "num_attention_heads") ?? 0
+        guard (hd == 128 && qh == 32 || hd == 64 && qh == 64) && int(cj, "num_key_value_heads") == 8 else {
+            return "heads \(qh)/\(int(cj, "num_key_value_heads") ?? 0) of \(hd) (32/8 of 128 or 64/8 of 64 supported)"
         }
+        // The head-64 kernels (gpt-oss's) take the q/k/v/o biases and a scaled RoPE; the head-128 ones neither.
+        let scaled: Bool
+        do {
+            scaled = try ropeScaling(cj) != nil
+        } catch {
+            return "RoPE: \(error)"
+        }
+        if hd == 128 && (cj["attention_bias"] as? Bool == true || scaled) {
+            return "attention biases or a scaled RoPE with heads of 128 (only with heads of 64)"
+        }
+        if cj["mlp_bias"] as? Bool == true { return "MLP biases" }
         if v1 == false {
             let v2OK =
                 int(dc, "block_size").map(blocks.contains) == true && int(cj, "sliding_window") == window
@@ -41,6 +51,18 @@ extension DFlash2Drafter {
             if !v2OK { return "DFlash2 block, window, conv or selector not supported" }
         }
         return nil
+    }
+
+    /// The drafter's RoPE scaling (`rope_scaling` or `rope_parameters`; nil for the default RoPE): the kernels take
+    /// one per drafter, of the kinds RopeTable computes (yarn, linear).
+    static func ropeScaling(_ cj: [String: Any]) throws -> RopeScaling? {
+        let all = try (RopeSpec.allParameters(cj) + [cj["rope_scaling"]].compactMap { $0 as? [String: Any] })
+            .compactMap { try RopeScaling.parse($0) }
+        guard let s = all.first else { return nil }
+        guard all.allSatisfy({ $0 == s }), s.kind != .proportional else {
+            throw SafetensorsError.format("drafter with several or proportional RoPE scalings")
+        }
+        return s
     }
 
     /// `mismatch` for the drafter in `directory` (config.json and, if readable, the safetensors headers for v1/v2).
@@ -57,8 +79,8 @@ extension DFlash2Drafter {
     /// 1. `option` (`--drafter`) "none": nil;
     /// 2. `option` with a name or path: that one (an error if it does not fit);
     /// 3. a family without drafter (LFM2, Granite, gpt-oss…): nil, except a toy (`metal_lab_toy`) with a `drafter/`
-    ///    when `toyPack` (lab serve, reuse, prefixcache, splitcheck; lab-dev gen passes false and uses it only with
-    ///    `--drafter`; no generated toy has one now); a real pack's `drafter/` is then left out and `log` says so;
+    ///    when `toyPack` (lab serve and every lab-dev check: toy-gptoss's); a real pack's `drafter/` is then left out
+    ///    and `log` says so;
     /// 4. the `drafter/` of the model pack (the 27B's, the toys'): that one (an error if it does not fit);
     /// 5. none if the family's is not for this model (ModelSpec.defaultDrafter nil: Gemma 4 other than the 26B-A4B);
     ///    it is not looked up;

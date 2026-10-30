@@ -222,7 +222,7 @@ public struct ModelFootprint: Sendable, Equatable {
         var capsRow = 0
         if let dc = drafterConfig, let dw = drafterWeightBytes {
             // Drafter (Drafter.swift): 4-bit weights, captures of 2048 rows × (target layers · H) half, fc fp32,
-            // enc half, kvout 2048 × 2048 fp32, each layer's kc|vt ring (KV heads × slots × head dim half)
+            // enc half, kvout 2048 × (2 × KV heads × head dim) fp32, each layer's kc|vt ring (KV heads × slots × head dim half)
             // and (block − 1)-row logits.
             let H = int(dc, "hidden_size") ?? cfg.hiddenSize
             let dfc = dc["dflash_config"] as? [String: Any]
@@ -234,8 +234,14 @@ public struct ModelFootprint: Sendable, Equatable {
             let slots = wins.reduce(0) { $0 + DFlash2Drafter.slots(window: $1) }
             let ring = 2 * (int(dc, "num_key_value_heads") ?? 8) * (int(dc, "head_dim") ?? 128) * 2
             let cap = 2048
+            // A model with an 8-bit lm_head: the drafter's own 4-bit copy (Drafter.swift `draftHead`).
+            let headBits = (cfg.raw["quantization"] as? [String: Any]).flatMap { q in
+                ((q["lm_head"] as? [String: Any])?["bits"] ?? q["bits"]) as? NSNumber
+            }?.intValue
+            let draftHead = headBits == 8 ? cfg.vocabSize * cfg.hiddenSize * 9 / 16 : 0
             let buffers =
-                cap * targets * H * 2 + cap * H * 6 + cap * 2048 * 4 + slots * ring + draftRows * cfg.vocabSize * 4
+                cap * targets * H * 2 + cap * H * 6 + cap * ring * 2 + slots * ring + draftRows * cfg.vocabSize * 4
+                + draftHead
             dBytes = dw + buffers
             dSnap = slots * ring
             capsRow = targets * H * 2

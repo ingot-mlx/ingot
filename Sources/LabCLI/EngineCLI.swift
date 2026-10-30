@@ -112,7 +112,8 @@ package func describeLossy(_ m: HybridModel) {
 
 /// The drafter in `directory` (resolvedDrafterDir).
 package func openDrafter(_ ctx: MetalContext, _ directory: URL, _ m: HybridModel) throws -> DFlash2Drafter {
-    try DFlash2Drafter(ctx: ctx, directory: directory, vocab: m.vocab, embedScale: m.spec.block.embedScale)
+    try DFlash2Drafter(
+        ctx: ctx, directory: directory, vocab: m.vocab, embedScale: m.spec.block.embedScale, lmHead: m.lmHead)
 }
 
 /// The model's drafter (resolvedDrafterDir with the toy's `drafter/`) opened, or nil if it runs without one.

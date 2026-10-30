@@ -20,8 +20,8 @@ import MetalLab
     // --check compares the two (identical tokens) and the normal one with mlx-lm's greedy (ref/out/<genRefSet>,
     // gen_ref.py).
     // The same without drafter: with --drafter none, a family without one, or when the family's does not fit the model
-    // (resolvedDrafterDir: Qwen3.5 0.8B and 2B). A toy whose family has no drafter (none of
-    // the generated toys now) uses its `drafter/` only with --drafter: its golden is the run without one.
+    // (resolvedDrafterDir: Qwen3.5 0.8B and 2B). A toy whose family has no drafter by default (toy-gptoss) takes its
+    // `drafter/` as lab serve does: its golden is the run with it (--drafter none for the run without).
     let mode = check ? "both" : args.str("mode", "both")
     let drafterDir = try genDrafterDir(dir, cfg, mode: mode)
     let noDrafter = drafterDir == nil
@@ -290,11 +290,11 @@ private func f32Margin(_ base: String, at pos: Int) -> Double? {
 }
 
 /// The last line of a green --check: what was compared (the CI log has to say whether mlx-lm was).
-/// gen's drafter (resolvedDrafterDir without the toy's `drafter/`). In normal mode it is not opened: one missing from
-/// the cache is not an error.
+/// gen's drafter (resolvedDrafterDir with the toy's `drafter/`, as lab serve). In normal mode it is not opened: one
+/// missing from the cache is not an error.
 private func genDrafterDir(_ dir: URL, _ cfg: ModelConfig, mode: String) throws -> URL? {
-    if mode == "normal" { return try? resolvedDrafterDir(dir, cfg, toyPack: false) }
-    return try resolvedDrafterDir(dir, cfg, toyPack: false)
+    if mode == "normal" { return try? resolvedDrafterDir(dir, cfg, toyPack: true) }
+    return try resolvedDrafterDir(dir, cfg, toyPack: true)
 }
 
 private func checkSummary(prompts: Int, noDrafter: Bool, mlxCompared: Int) -> String {

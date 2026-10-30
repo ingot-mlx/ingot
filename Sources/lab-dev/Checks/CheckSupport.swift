@@ -21,6 +21,27 @@ func logitDistanceNote(_ x: [Float], _ ref: [Float]) -> String {
     return String(format: "max |Δlogit| %.3g, NMSE %.3g", d.maxAbs, d.nmse)
 }
 
+/// The drafter's context ring at the window positions before `end`, every layer (kc [8, slots, head dim] and vt
+/// [8, head dim, slots] in half; position p goes in slot p % window, dctx_write: the slots from window on are the
+/// block's, not the context's). Only those positions: the slots behind the window keep what each history left. Window
+/// and slots are per layer (8192 in the full layers of a DFlash v1).
+func drafterRing(_ dr: DFlash2Drafter, before end: Int) -> [UInt16] {
+    var out: [UInt16] = []
+    let D = dr.headDim
+    for l in dr.layers {
+        let S = l.slots, W = l.window
+        let live = Set((max(0, end - W)..<end).map { $0 % W })
+        let kc = l.kc.contents().bindMemory(to: UInt16.self, capacity: 8 * S * D)
+        let vt = l.vt.contents().bindMemory(to: UInt16.self, capacity: 8 * S * D)
+        for h in 0..<8 {
+            for s in 0..<S where live.contains(s) {
+                for d in 0..<D { out.append(kc[(h * S + s) * D + d]); out.append(vt[(h * D + d) * S + s]) }
+            }
+        }
+    }
+    return out
+}
+
 /// Index of the largest element (the last of equal maxima, as `max(by:)`; 0 if empty).
 func argmaxIndex<T: Comparable>(_ a: [T]) -> Int { a.indices.max { a[$0] < a[$1] } ?? 0 }
 

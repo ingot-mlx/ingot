@@ -391,27 +391,8 @@ func lcp(_ a: [UInt32], _ b: [UInt32]) -> Int {
     // a) The drafter ring of the entry against that of a pass of the same history ending at the cut.
     var ringOK = true
     if let dr = eng.drafter {
-        // Only the positions of the window before the cut: the slots behind it keep what each history left
-        // (kc [8, slots, 128] and vt [8, 128, slots] in half; position p goes in slot p % window, dctx_write: the
-        // slots from window on are the block's, not the context's). Window and slots are per layer (8192 in the full
-        // layer of a DFlash v1).
-        func ring() -> [UInt16] {
-            var out: [UInt16] = []
-            for l in dr.layers {
-                let S = l.slots, W = l.window
-                let live = Set((max(0, conv - W)..<conv).map { $0 % W })
-                let kc = l.kc.contents().bindMemory(to: UInt16.self, capacity: 8 * S * 128)
-                let vt = l.vt.contents().bindMemory(to: UInt16.self, capacity: 8 * S * 128)
-                for h in 0..<8 {
-                    for s in 0..<S where live.contains(s) {
-                        for d in 0..<128 {
-                            out.append(kc[(h * S + s) * 128 + d]); out.append(vt[(h * 128 + d) * S + s])
-                        }
-                    }
-                }
-            }
-            return out
-        }
+        // Only the positions of the window before the cut (drafterRing).
+        func ring() -> [UInt16] { drafterRing(dr, before: conv) }
         eng.forgetLive()
         let again = try eng.generate(prompt: P1, maxTokens: 8, sampling: greedy, stopTokens: [])
         // After the decode, the last token may already be inside (P = head2) or not (P = head2 − 1, depending on where

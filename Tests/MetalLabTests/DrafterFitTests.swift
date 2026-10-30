@@ -58,6 +58,33 @@ import Testing
         // DFlash v1 does not need the DFlash2 block; unknown v1/v2 (no headers) skips that check.
         #expect(DFlash2Drafter.mismatch(config: block, hidden: 2048, layers: 40, v1: true) == nil)
         #expect(DFlash2Drafter.mismatch(config: block, hidden: 2048, layers: 40, v1: nil) == nil)
+        // gpt-oss 20b's DFlash v1 (z-lab/gpt-oss-20b-DFlash): 64/8 heads of 64 with biases and YaRN fit; biases or a
+        // scaled RoPE with heads of 128 do not, nor other head shapes or MLP biases.
+        let rope: [String: Any] = [
+            "rope_type": "yarn", "factor": 32.0, "original_max_position_embeddings": 4096, "beta_fast": 32.0,
+            "beta_slow": 1.0, "truncate": false,
+        ]
+        var oss: [String: Any] = [
+            "hidden_size": 2880, "num_target_layers": 24, "head_dim": 64, "num_attention_heads": 64,
+            "num_key_value_heads": 8, "attention_bias": true, "rope_theta": 150000, "rope_scaling": rope,
+            "dflash_config": ["mask_token_id": 200000, "target_layer_ids": [1, 6, 11, 16, 21]] as [String: Any],
+        ]
+        let g = try Self.dims("gpt-oss-20b")
+        func v1(_ d: [String: Any]) -> String? {
+            DFlash2Drafter.mismatch(config: d, hidden: g.hidden, layers: g.layers, v1: true)
+        }
+        #expect(v1(oss) == nil)
+        oss["num_attention_heads"] = 32
+        #expect(v1(oss)?.hasPrefix("heads 32/8 of 64") == true)
+        oss["num_attention_heads"] = 64
+        oss["mlp_bias"] = true
+        #expect(v1(oss) == "MLP biases")
+        var biased = Self.q36
+        biased["attention_bias"] = true
+        #expect(try check(biased, "qwen3.6-35b-a3b")?.hasPrefix("attention biases or a scaled RoPE") == true)
+        var yarn = Self.q36
+        yarn["rope_scaling"] = rope
+        #expect(try check(yarn, "qwen3.6-35b-a3b")?.hasPrefix("attention biases or a scaled RoPE") == true)
     }
 
     /// A temporary tree with model and drafter directories (config.json only).
@@ -120,7 +147,7 @@ import Testing
         #expect(try resolve(heretic, option: q36Name) == cache[q36Name])
         #expect(throws: SafetensorsError.self) { try resolve(q08, option: q36Name) }
         #expect(throws: SafetensorsError.self) { try resolve(q2, option: q36Name) }
-        // A family without drafter: none; the toy's `drafter/` only with toyPack (gen uses it only with --drafter).
+        // A family without drafter: none; the toy's `drafter/` only with toyPack (every lab-dev check passes it).
         #expect(try resolve(granite) == nil)
         #expect(try resolve(toyGranite, toyPack: false) == nil)
         #expect(try resolve(toyGranite) == toyGranite.appendingPathComponent("drafter"))

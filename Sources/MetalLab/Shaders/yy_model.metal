@@ -155,7 +155,6 @@ constant constexpr uint DF_H = LAB_HIDDEN, DF_GS = 16, DF_G = DF_H / DF_GS;   //
 constant constexpr uint DF_DYN = 4 * DF_G;                       // output of kernel_projection per row
 // The context window and the ring slots are per layer (DAttnParams win/slots): 2048 and 2080 (window + up to 16 of
 // block, to a multiple of 32) except the full-attention layer of a DFlash v1 drafter (8192 and 8224).
-constant constexpr uint DF_HD = 128, DF_QH = 32, DF_KVH = 8, DF_QKV = 6144;
 
 // Two-tap dynamic conv: out_t = Σ_tap (base[half][tap] + dyn_t[half][tap][c/16]) ⊙ x_{t−tap}, with x_{−1} = 0
 // (the block starts from zero). base_kernel [2 (prepare|finish), 2 (tap), 2048]; dyn [L, 2, 2, 128] fp32 (output of
@@ -240,73 +239,98 @@ struct DAttnParams {
     uint slots;   // slots of the layer's ring: win + up to 16 of block, to a multiple of 32
 };
 
-// Per-head RMSNorm (128) with weight + standard RoPE (non-interleaved halves, 128 dimensions) in a threadgroup of
-// 128 threads (one dimension each).
+// Per-head RMSNorm (HD) with weight + RoPE (non-interleaved halves over the whole head) in a threadgroup of HD threads
+// (one dimension each, HD / 32 simdgroups). TAB: the angle of pair i from the drafter's table (fp32 [HD / 2 + 1]:
+// inv_freq per pair, then the mscale that multiplies the rotated value; RopeTable.swift, YaRN), otherwise θ^(−i/(HD/2)).
+template <uint HD, bool TAB>
 inline float dnorm_rope(float x, uint d, const device bfloat* nw, float pos, float eps, float theta,
-                        threadgroup float* xs, threadgroup float* part, ushort sg, ushort lane) {
+                        const device float* rtab, threadgroup float* xs, threadgroup float* part, ushort sg,
+                        ushort lane) {
+    constexpr uint RH = HD / 2;
     const float ss = simd_sum(x * x);
     if (lane == 0) part[sg] = ss;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    const float tot = part[0] + part[1] + part[2] + part[3];
-    x = x * rsqrt(tot / float(DF_HD) + eps) * float(nw[d]);
+    float tot;
+    if constexpr (HD == 128) tot = part[0] + part[1] + part[2] + part[3];
+    else tot = part[0] + part[1];
+    x = x * rsqrt(tot / float(HD) + eps) * float(nw[d]);
     xs[d] = x;
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    const uint i = d % 64;
-    const float ang = pos * pow(theta, -float(i) / 64.0f);
+    const uint i = d % RH;
+    float ang;
+    if constexpr (TAB) ang = pos * rtab[i];
+    else ang = pos * pow(theta, -float(i) / float(RH));
     const float c = cos(ang), s = sin(ang);
-    return d < 64 ? x * c - xs[d + 64] * s : x * c + xs[d - 64] * s;
+    const float r = d < RH ? x * c - xs[d + RH] * s : x * c + xs[d - RH] * s;
+    if constexpr (TAB) return r * rtab[RH];
+    else return r;
 }
 
-// Block: q (32 heads), k (8) and v (8) of the L = block rows. Grid (48, L), 128 threads.
-[[kernel]] void dattn_prework(const device float*  qkv [[buffer(0)]],   // [L, 6144]
-                              const device bfloat* qnw [[buffer(1)]],
-                              const device bfloat* knw [[buffer(2)]],
-                              device half*         q   [[buffer(3)]],   // [8, 4·block (m = row·4 + h), 128]
-                              device half*         kc  [[buffer(4)]],   // [8, slots, 128]
-                              device half*         vt  [[buffer(5)]],   // [8, 128, slots]
-                              constant DAttnParams& p  [[buffer(6)]],
-                              const device uint*   st  [[buffer(7)]],
+// Shapes of the drafter attention: head dim HD and QH q heads over DF_KVH KV heads (G = QH / DF_KVH per KV head, so
+// QH · HD = 4096 in both instances). 128: 32/8, no biases, θ RoPE (Qwen3.6, Gemma 4). 64: 64/8 with q/k/v biases
+// (added before q/k_norm, as the reference's q_norm(q_proj(x))) and the RoPE table (gpt-oss's, YaRN).
+constant constexpr uint DF_KVH = 8;
+
+// Block: q (QH heads), k (8) and v (8) of the L = block rows. Grid (QH + 16, L), HD threads.
+template <uint HD, uint QH, bool BR>
+[[kernel]] void dattn_prework(const device float*  qkv  [[buffer(0)]],   // [L, (QH + 16) · HD]
+                              const device bfloat* qnw  [[buffer(1)]],
+                              const device bfloat* knw  [[buffer(2)]],
+                              device half*         q    [[buffer(3)]],   // [8, G·block (m = row·G + h), HD]
+                              device half*         kc   [[buffer(4)]],   // [8, slots, HD]
+                              device half*         vt   [[buffer(5)]],   // [8, HD, slots]
+                              constant DAttnParams& p   [[buffer(6)]],
+                              const device uint*   st   [[buffer(7)]],
+                              const device bfloat* bias [[buffer(8)]],   // BR: [(QH + 16) · HD] (q | k | v)
+                              const device float*  rtab [[buffer(9)]],   // BR: [HD / 2 + 1]
                               uint2 tg [[threadgroup_position_in_grid]],
                               uint d [[thread_index_in_threadgroup]],
                               ushort sg [[simdgroup_index_in_threadgroup]],
                               ushort lane [[thread_index_in_simdgroup]]) {
-    threadgroup float xs[DF_HD];
-    threadgroup float part[4];
+    constexpr uint G = QH / DF_KVH, QKV = (QH + 2 * DF_KVH) * HD;
+    threadgroup float xs[HD];
+    threadgroup float part[HD / 32];
     const uint slot = tg.x, t = tg.y, P = p.dyn ? st[0] : p.P;
-    const float x = qkv[t * DF_QKV + slot * DF_HD + d];
-    if (slot >= 40) {
-        vt[(size_t(slot - 40) * DF_HD + d) * p.slots + p.win + t] = half(x);
+    float x = qkv[t * QKV + slot * HD + d];
+    if constexpr (BR) x += float(bias[slot * HD + d]);
+    if (slot >= QH + DF_KVH) {
+        vt[(size_t(slot - QH - DF_KVH) * HD + d) * p.slots + p.win + t] = half(x);
         return;
     }
-    const float r = dnorm_rope(x, d, slot < 32 ? qnw : knw, float(P + t), p.eps, p.theta, xs, part, sg, lane);
-    if (slot < 32) q[(size_t(slot / 4) * 4 * p.block + t * 4 + slot % 4) * DF_HD + d] = half(r);
-    else kc[(size_t(slot - 32) * p.slots + p.win + t) * DF_HD + d] = half(r);
+    const float r =
+        dnorm_rope<HD, BR>(x, d, slot < QH ? qnw : knw, float(P + t), p.eps, p.theta, rtab, xs, part, sg, lane);
+    if (slot < QH) q[(size_t(slot / G) * G * p.block + t * G + slot % G) * HD + d] = half(r);
+    else kc[(size_t(slot - QH) * p.slots + p.win + t) * HD + d] = half(r);
 }
 
 // Context: K (k_norm + RoPE) and V of the accepted rows into the window ring (slot = position % win).
-// Grid (16, rows), 128 threads; only the first nvalid write.
-[[kernel]] void dctx_write(const device float*  kv  [[buffer(0)]],   // [rows, 2048] (k 1024 | v 1024)
-                           const device bfloat* knw [[buffer(1)]],
-                           device half*         kc  [[buffer(2)]],
-                           device half*         vt  [[buffer(3)]],
-                           constant DAttnParams& p  [[buffer(4)]],
-                           const device uint*   st  [[buffer(5)]],
+// Grid (16, rows), HD threads; only the first nvalid write.
+template <uint HD, bool BR>
+[[kernel]] void dctx_write(const device float*  kv   [[buffer(0)]],   // [rows, 16 · HD] (k 8 · HD | v 8 · HD)
+                           const device bfloat* knw  [[buffer(1)]],
+                           device half*         kc   [[buffer(2)]],
+                           device half*         vt   [[buffer(3)]],
+                           constant DAttnParams& p   [[buffer(4)]],
+                           const device uint*   st   [[buffer(5)]],
+                           const device bfloat* bias [[buffer(6)]],   // BR: [16 · HD] (k | v)
+                           const device float*  rtab [[buffer(7)]],   // BR: [HD / 2 + 1]
                            uint2 tg [[threadgroup_position_in_grid]],
                            uint d [[thread_index_in_threadgroup]],
                            ushort sg [[simdgroup_index_in_threadgroup]],
                            ushort lane [[thread_index_in_simdgroup]]) {
-    threadgroup float xs[DF_HD];
-    threadgroup float part[4];
+    threadgroup float xs[HD];
+    threadgroup float part[HD / 32];
     const uint slot = tg.x, t = tg.y;
     if (t >= (p.dyn ? st[2] : p.nvalid)) return;
     const uint pos = (p.dyn ? st[3] : p.pos0) + t, ring = pos % p.win;
-    const float x = kv[t * 2048 + slot * DF_HD + d];
-    if (slot >= 8) {
-        vt[(size_t(slot - 8) * DF_HD + d) * p.slots + ring] = half(x);
+    float x = kv[t * (2 * DF_KVH * HD) + slot * HD + d];
+    if constexpr (BR) x += float(bias[slot * HD + d]);
+    if (slot >= DF_KVH) {
+        vt[(size_t(slot - DF_KVH) * HD + d) * p.slots + ring] = half(x);
         return;
     }
-    const float r = dnorm_rope(x, d, knw, float(pos), p.eps, p.theta, xs, part, sg, lane);
-    kc[(size_t(slot) * p.slots + ring) * DF_HD + d] = half(r);
+    const float r = dnorm_rope<HD, BR>(x, d, knw, float(pos), p.eps, p.theta, rtab, xs, part, sg, lane);
+    kc[(size_t(slot) * p.slots + ring) * HD + d] = half(r);
 }
 
 // Does row t of the block see slot n? Window: context position k visible if P + t − k < W; block: all B rows.
@@ -318,27 +342,29 @@ inline bool dvisible(uint n, uint t, uint P, uint B, uint W) {
 }
 
 // Drafter attention on NAX (adapted from the fp16 verification kernel since removed): threadgroup = (chunk of C
-// keys, 16 queries, KV head), with Q = 4 · block queries per KV head (grid (nsplit, block / 4, 8)); 4 simdgroups, s
-// takes dimensions [32s, 32s + 32).
+// keys, 16 queries, KV head), with Q = G · block queries per KV head (grid (nsplit, Q / 16, 8)); HD / 32 simdgroups,
+// s takes dimensions [32s, 32s + 32).
+template <uint HD, uint QH>
 [[kernel]] void dattn_nax(const device half* q     [[buffer(0)]],
                           const device half* kc    [[buffer(1)]],
                           const device half* vt    [[buffer(2)]],
-                          device float*      opart [[buffer(3)]],   // [8, nsplit, Q, 128]
+                          device float*      opart [[buffer(3)]],   // [8, nsplit, Q, HD]
                           device float2*     ml    [[buffer(4)]],   // [8, nsplit, Q]
                           constant DAttnParams& p  [[buffer(5)]],
                           const device uint*   st  [[buffer(6)]],
                           uint3 tg [[threadgroup_position_in_grid]],
                           ushort sg [[simdgroup_index_in_threadgroup]],
                           ushort lane [[thread_index_in_simdgroup]]) {
-    threadgroup float red[2][4][16 * 32];
-    const uint split = tg.x, qf = tg.y, kvh = tg.z, Q = 4 * p.block, P = p.dyn ? st[0] : p.P;
+    constexpr uint G = QH / DF_KVH, NSG = HD / 32;
+    threadgroup float red[2][NSG][16 * 32];
+    const uint split = tg.x, qf = tg.y, kvh = tg.z, Q = G * p.block, P = p.dyn ? st[0] : p.P;
     const uint key0 = split * p.C, kend = min(key0 + p.C, p.slots), S = p.slots;
     const short2 co = nax_coord(lane);
     const uint fm = co.x, fn = co.y;
     const uint d0 = 32 * sg;
-    const device half* qh = q + size_t(kvh) * Q * DF_HD;
-    const device half* kh = kc + size_t(kvh) * S * DF_HD;
-    const device half* vh = vt + size_t(kvh) * DF_HD * S;
+    const device half* qh = q + size_t(kvh) * Q * HD;
+    const device half* kh = kc + size_t(kvh) * S * HD;
+    const device half* vh = vt + size_t(kvh) * HD * S;
     const uint qr0 = qf * 16 + fm, qr1 = qf * 16 + fm + 8;
     // A chunk of ring slots no position < P has reached yet (n ≥ P) sees nothing: the same (m, l) = (−∞, 0) the loop
     // would leave, which dattn_reduce skips, without reading its keys (the 8192 ring of a short context).
@@ -352,11 +378,11 @@ inline bool dvisible(uint n, uint t, uint P, uint B, uint W) {
     }
     nax_hfrag qa[2];
     VUNROLL for (int c = 0; c < 2; c++) {
-        const half4 v0 = *(const device half4*)(qh + size_t(qr0) * DF_HD + d0 + 16 * c + fn);
-        const half4 v1 = *(const device half4*)(qh + size_t(qr1) * DF_HD + d0 + 16 * c + fn);
+        const half4 v0 = *(const device half4*)(qh + size_t(qr0) * HD + d0 + 16 * c + fn);
+        const half4 v1 = *(const device half4*)(qh + size_t(qr1) * HD + d0 + 16 * c + fn);
         qa[c] = nax_hfrag(v0, v1);
     }
-    const uint t0 = qr0 / 4, t1 = qr1 / 4;
+    const uint t0 = qr0 / G, t1 = qr1 / G;
     nax_ffrag o[2];
     o[0] = 0; o[1] = 0;
     float m0 = -INFINITY, m1 = -INFINITY, l0 = 0, l1 = 0;
@@ -365,8 +391,8 @@ inline bool dvisible(uint n, uint t, uint P, uint B, uint W) {
         nax_ffrag s0 = 0, s1 = 0;
         VUNROLL for (int c = 0; c < 2; c++) {
             nax_hfrag kb0, kb1;
-            nax_load(kb0, kh + size_t(k0) * DF_HD + d0 + 16 * c, DF_HD, co);
-            nax_load(kb1, kh + size_t(k0 + 16) * DF_HD + d0 + 16 * c, DF_HD, co);
+            nax_load(kb0, kh + size_t(k0) * HD + d0 + 16 * c, HD, co);
+            nax_load(kb1, kh + size_t(k0 + 16) * HD + d0 + 16 * c, HD, co);
             nax_mma2(s0, s1, qa[c], kb0, kb1);
         }
         VUNROLL for (int e = 0; e < 8; e++) {
@@ -379,7 +405,11 @@ inline bool dvisible(uint n, uint t, uint P, uint B, uint W) {
         float mx0 = -INFINITY, mx1 = -INFINITY;
         VUNROLL for (int f = 0; f < 2; f++) VUNROLL for (int e = 0; e < 8; e++) {
             const uint m = fm + 8 * (e / 4), n = 16 * f + fn + e % 4;
-            float v = red[buf][0][m * 32 + n] + red[buf][1][m * 32 + n] + red[buf][2][m * 32 + n] + red[buf][3][m * 32 + n];
+            float v;
+            if constexpr (NSG == 4)
+                v = red[buf][0][m * 32 + n] + red[buf][1][m * 32 + n] + red[buf][2][m * 32 + n] + red[buf][3][m * 32 + n];
+            else
+                v = red[buf][0][m * 32 + n] + red[buf][1][m * 32 + n];
             const uint key = k0 + n;
             const bool ok = key < kend && dvisible(key, e < 4 ? t0 : t1, P, p.block, p.win);
             v = ok ? v * p.scale : -INFINITY;
@@ -409,10 +439,10 @@ inline bool dvisible(uint n, uint t, uint P, uint B, uint W) {
             nax_mma2(o[0], o[1], pa[kc2], vb[0], vb[1]);
         }
     }
-    device float* op = opart + (size_t(kvh) * p.nsplit + split) * Q * DF_HD;
+    device float* op = opart + (size_t(kvh) * p.nsplit + split) * Q * HD;
     VUNROLL for (int f = 0; f < 2; f++) VUNROLL for (int i = 0; i < 2; i++) {
         const uint m = qf * 16 + fm + 8 * i;
-        *(device float4*)(op + size_t(m) * DF_HD + d0 + 16 * f + fn) =
+        *(device float4*)(op + size_t(m) * HD + d0 + 16 * f + fn) =
             float4(o[f][4 * i], o[f][4 * i + 1], o[f][4 * i + 2], o[f][4 * i + 3]);
     }
     if (sg == 0 && (lane & 9) == 0) {
@@ -422,14 +452,16 @@ inline bool dvisible(uint n, uint t, uint P, uint B, uint W) {
     }
 }
 
-// Combine the chunks: out[t, (kvh·4 + h)·128 + d]. Grid (4 · block, 8), 128 threads.
+// Combine the chunks: out[t, (kvh·G + h)·HD + d]. Grid (G · block, 8), HD threads.
+template <uint HD, uint QH>
 [[kernel]] void dattn_reduce(const device float*  opart [[buffer(0)]],
                              const device float2* ml    [[buffer(1)]],
-                             device half*         out   [[buffer(2)]],   // [block, 4096]
+                             device half*         out   [[buffer(2)]],   // [block, QH · HD]
                              constant DAttnParams& p    [[buffer(3)]],
                              uint2 tg [[threadgroup_position_in_grid]],
                              uint d [[thread_index_in_threadgroup]]) {
-    const uint m = tg.x, kvh = tg.y, Q = 4 * p.block, t = m / 4, h = kvh * 4 + m % 4;
+    constexpr uint G = QH / DF_KVH;
+    const uint m = tg.x, kvh = tg.y, Q = G * p.block, t = m / G, h = kvh * G + m % G;
     const device float2* mlh = ml + size_t(kvh) * p.nsplit * Q;
     float M = -INFINITY;
     for (uint s = 0; s < p.nsplit; s++) M = max(M, mlh[s * Q + m].x);
@@ -439,10 +471,31 @@ inline bool dvisible(uint n, uint t, uint P, uint B, uint W) {
         if (v.x == -INFINITY) continue;
         const float w = exp(v.x - M);
         L += w * v.y;
-        o += w * opart[((size_t(kvh) * p.nsplit + s) * Q + m) * DF_HD + d];
+        o += w * opart[((size_t(kvh) * p.nsplit + s) * Q + m) * HD + d];
     }
-    out[size_t(t) * 4096 + h * DF_HD + d] = half(o / L);
+    out[size_t(t) * (QH * HD) + h * HD + d] = half(o / L);
 }
+
+// The o_proj bias of a drafter with biases (bf16 [N]) added to its fp32 rows [rows, N] after the accumulated o_proj.
+[[kernel]] void dbias_add(device float* x [[buffer(0)]], const device bfloat* b [[buffer(1)]],
+                          constant uint& N [[buffer(2)]], uint i [[thread_position_in_grid]]) {
+    x[i] += float(b[i % N]);
+}
+
+#define DATTN_INST(SUF, HD, QH, BR)                                                                                \
+  template [[host_name("dattn_prework" SUF)]] [[kernel]] void dattn_prework<HD, QH, BR>(const device float*,      \
+      const device bfloat*, const device bfloat*, device half*, device half*, device half*, constant DAttnParams&, \
+      const device uint*, const device bfloat*, const device float*, uint2, uint, ushort, ushort);               \
+  template [[host_name("dctx_write" SUF)]] [[kernel]] void dctx_write<HD, BR>(const device float*,                \
+      const device bfloat*, device half*, device half*, constant DAttnParams&, const device uint*,               \
+      const device bfloat*, const device float*, uint2, uint, ushort, ushort);                                   \
+  template [[host_name("dattn_nax" SUF)]] [[kernel]] void dattn_nax<HD, QH>(const device half*,                   \
+      const device half*, const device half*, device float*, device float2*, constant DAttnParams&,              \
+      const device uint*, uint3, ushort, ushort);                                                                \
+  template [[host_name("dattn_reduce" SUF)]] [[kernel]] void dattn_reduce<HD, QH>(const device float*,            \
+      const device float2*, device half*, constant DAttnParams&, uint2, uint);
+DATTN_INST("", 128, 32, false)
+DATTN_INST("_h64", 64, 64, true)
 
 // Top-16 of each row of logits (fp32): each thread keeps its sorted list, each simdgroup merges those of its 32
 // lanes and simdgroup 0 merges those of the 32 simdgroups. Ties go to the lower index. Grid (rows), 1024 threads.

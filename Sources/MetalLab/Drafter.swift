@@ -6,8 +6,9 @@ import Metal
 // layers): dense qwen3 layers with dynamic conv, windowed context of 2048 taken from big-model layers, non-causal
 // block of 8 or 16 (anchor + masks; Muse Glimmer's is 16), lm_head of the big model and candidate selector. Protocol and shape after mlx-serve
 // (`src/dflash.zig`, MIT) and splash (Apache-2.0, quantizes the drafter to 4 bits at load). Also DFlash v1 (`v1`), Gemma 4
-// 26B-A4B's default (`z-lab/gemma-4-26B-A4B-it-DFlash`: 5 layers, hidden 2816, context of 6 layers). Kernels:
-// yy_model.metal.
+// 26B-A4B's default (`z-lab/gemma-4-26B-A4B-it-DFlash`: 5 layers, hidden 2816, context of 6 layers), and gpt-oss 20b's
+// (`z-lab/gpt-oss-20b-DFlash`: 8 layers, 64/8 heads of 64 with q/k/v/o biases, YaRN RoPE, context of 5 layers).
+// Kernels: yy_model.metal.
 
 struct DAttnParams {
     var P: UInt32, nvalid: UInt32, pos0: UInt32, C: UInt32, nsplit: UInt32
@@ -47,12 +48,15 @@ public final class DFlash2Drafter {
     public let ctxWidth: Int
     public struct Layer {
         public let n1, n2, qn, kn: MTLBuffer
+        /// Attention biases (bf16) of a drafter with `attention_bias`: q | k | v (the k | v part also feeds the
+        /// context) and o_proj; nil without them.
+        public let qkvBias, oBias: MTLBuffer?
         /// Dynamic conv of DFlash2 (nil in DFlash v1).
         public let abase, mbase: MTLBuffer?
         public let qkv, kv, o, gu, down: DenseQ
         public let aproj, mproj: DenseQ?
         public let kc, vt: MTLBuffer
-        /// Context window and ring slots of this layer (kc [8, slots, 128], vt [8, 128, slots] half).
+        /// Context window and ring slots of this layer (kc [8, slots, head dim], vt [8, head dim, slots] half).
         public let window, slots: Int
     }
     /// DFlash v1 (z-lab/dflash `DFlashDraftModel` in `dflash/model.py`): the same qwen3 layers with the big model's context, but without
@@ -65,6 +69,15 @@ public final class DFlash2Drafter {
     public let targetLayers: [Int]
     public let maskToken: UInt32
     public let eps: Float, theta: Float
+    /// Attention shape: head dim and q heads over 8 KV heads; 128 and 32 (Qwen3.6, Gemma 4) or 64 and 64 (gpt-oss's,
+    /// with biases and YaRN), the two instances of the kernels (`DFlash2Drafter.mismatch`).
+    public let headDim: Int, qHeads: Int
+    /// RoPE table (inv_freq per pair + mscale, RopeTable) of a drafter with a scaled RoPE (YaRN); nil: θ on the GPU.
+    let ropeTab: MTLBuffer?
+    /// Own lm_head for the drafts when the big model's is 8 bits: the same matrix requantized to 4 bits at load
+    /// (affine, groups of 64), as cheap as a 4-bit head; the verification keeps the big model's (gpt-oss: 4.1 → ~2.2 ms
+    /// per round, τ(6) −1.2% in MLX). nil: the big model's head.
+    public let draftHead: DenseQ?
     public let layers: [Layer]
     public let fc: DenseQ
     public let hproj: DenseQ?
@@ -97,8 +110,10 @@ public final class DFlash2Drafter {
     public let embedScale: Float
 
     /// `embedScale`: the big model's embedding multiplier, applied to the block only with a DFlash v1 drafter.
+    /// `lmHead`: the big model's; an 8-bit one gets a 4-bit copy for the drafts (`draftHead`).
     public init(
-        ctx: MetalContext, directory: URL, vocab: Int, capRows: Int = 2048, embedScale: Float = 1
+        ctx: MetalContext, directory: URL, vocab: Int, capRows: Int = 2048, embedScale: Float = 1,
+        lmHead: DenseQ? = nil
     ) throws {
         let t0 = Date()
         self.ctx = ctx
@@ -122,11 +137,8 @@ public final class DFlash2Drafter {
         logitsPost = mul != 1 || cap > 0 ? (mul, cap) : nil
         eps = Float((cj["rms_norm_eps"] as? NSNumber)?.doubleValue ?? 1e-6)
         theta = RopeSpec.theta(cj)
-        // dattn_prework (yy_model.metal) rotates with θ only (RoPE tables are for the model's attention).
-        for p in RopeSpec.allParameters(cj) + [cj["rope_scaling"]].compactMap({ $0 as? [String: Any] })
-        where RopeScaling.type(p) != "default" {
-            throw SafetensorsError.format("drafter with a scaled RoPE («\(RopeScaling.type(p))»)")
-        }
+        headDim = (cj["head_dim"] as? NSNumber)?.intValue ?? 128
+        qHeads = try int(cj, "num_attention_heads")
         let nl = try int(cj, "num_hidden_layers")
         H = try int(cj, "hidden_size")
         inter = try int(cj, "intermediate_size")
@@ -140,6 +152,11 @@ public final class DFlash2Drafter {
         if let why = Self.mismatch(config: cj, hidden: ctx.dims.hidden, layers: nil, v1: v1) {
             throw SafetensorsError.format("DFlash2 drafter with an unsupported shape (\(why))")
         }
+        // A scaled RoPE (only the head-64 shape, `mismatch`): the table the kernels read instead of θ.
+        let scaling = try Self.ropeScaling(cj)
+        let th = Double(theta), hd0 = headDim
+        ropeTab = scaling.map { ctx.buffer(RopeTable.make(theta: th, rotaryDims: hd0, scaling: $0)) }
+        let biased = cj["attention_bias"] as? Bool ?? false
         // bf16 weights quantized to 4 bits at load (as splash; at 8 bits it accepts 1.4% more and costs 1.3 ms more).
         func t(_ n: String) throws -> MTLBuffer { try alignedTensor(store, n, d) }
         // Norms read by rmsnorm_rows (type LAB_NWT): with a small-weights fp32 model (Bonsai), bf16 → fp32 (exact).
@@ -152,17 +169,35 @@ public final class DFlash2Drafter {
         func q4(_ ns: [String]) throws -> DenseQ {
             try DenseQ.quantize4(store: store, names: ns.map { $0 + ".weight" }, device: d, bits: Self.bits)
         }
+        // Biases the config asks for (`attention_bias`): a load error if missing. q | k | v concatenated in bf16.
+        func biases(_ names: [String]) throws -> MTLBuffer {
+            var all: [UInt16] = []
+            for n in names {
+                guard let i = store.tensors[n] else {
+                    throw SafetensorsError.format("drafter config.json asks for attention biases but \(n) is missing")
+                }
+                guard i.dtype == .bf16, i.shape.count == 1 else {
+                    throw SafetensorsError.format("\(n): expected bf16 [N]")
+                }
+                all += store.array(i, as: UInt16.self)
+            }
+            return ctx.buffer(all)
+        }
         var ls: [Layer] = []
         let wins = Self.layerWindows(config: cj, layers: nl, v1: v1)
+        let ring = 8 * headDim * 2
         for i in 0..<nl {
             let p = "layers.\(i)."
             let S = Self.slots(window: wins[i])
-            let kc = ctx.buffer(length: 8 * S * 128 * 2), vt = ctx.buffer(length: 8 * S * 128 * 2)
+            let kc = ctx.buffer(length: S * ring), vt = ctx.buffer(length: S * ring)
             memset(kc.contents(), 0, kc.length); memset(vt.contents(), 0, vt.length)
+            let a = p + "self_attn."
             ls.append(
                 Layer(
                     n1: try nw(p + "input_layernorm.weight"), n2: try nw(p + "post_attention_layernorm.weight"),
                     qn: try t(p + "self_attn.q_norm.weight"), kn: try t(p + "self_attn.k_norm.weight"),
+                    qkvBias: biased ? try biases(["q_proj", "k_proj", "v_proj"].map { a + $0 + ".bias" }) : nil,
+                    oBias: biased ? try biases([a + "o_proj.bias"]) : nil,
                     abase: v1 ? nil : try t(p + "attention_conv.base_kernel"),
                     mbase: v1 ? nil : try t(p + "mlp_conv.base_kernel"),
                     qkv: try q4(["q_proj", "k_proj", "v_proj"].map { p + "self_attn." + $0 }),
@@ -194,14 +229,15 @@ public final class DFlash2Drafter {
         caps = ctx.buffer(length: capRows * ctxWidth * 2)
         fcout = ctx.buffer(length: capRows * H * 4)
         enc = ctx.buffer(length: capRows * H * 2)
-        kvout = ctx.buffer(length: capRows * 2048 * 4)  // k (8 × 128) | v (8 × 128)
+        let hd = headDim, qh = qHeads
+        kvout = ctx.buffer(length: capRows * 16 * hd * 4)  // k (8 × head dim) | v (8 × head dim)
         let B = block
         x = ctx.buffer(length: B * H * 4); xn = ctx.buffer(length: B * H * 2); a = ctx.buffer(length: B * H * 2)
-        dyn = ctx.buffer(length: B * (4 * H / 16) * 4); qkv = ctx.buffer(length: B * 6144 * 4)
-        q = ctx.buffer(length: 8 * 4 * B * 128 * 2)  // 4 query heads per KV head and row
+        dyn = ctx.buffer(length: B * (4 * H / 16) * 4); qkv = ctx.buffer(length: B * (qh + 16) * hd * 4)
+        q = ctx.buffer(length: qh * B * hd * 2)  // qh / 8 query heads per KV head and row
         let ns = ls.map { Self.splits($0) }.max()!
-        opart = ctx.buffer(length: 8 * ns * 4 * B * 128 * 4); ml = ctx.buffer(length: 8 * ns * 4 * B * 8)
-        attn = ctx.buffer(length: B * 4096 * 2); y = ctx.buffer(length: B * H * 4)
+        opart = ctx.buffer(length: ns * qh * B * hd * 4); ml = ctx.buffer(length: ns * qh * B * 8)
+        attn = ctx.buffer(length: B * qh * hd * 2); y = ctx.buffer(length: B * H * 4)
         gu = ctx.buffer(length: B * 2 * inter * 4); hb = ctx.buffer(length: B * inter * 2)
         hid = ctx.buffer(length: B * H * 2)
         hp = ctx.buffer(length: B * 256 * 4); cidx = ctx.buffer(length: B * 16 * 4)
@@ -209,12 +245,21 @@ public final class DFlash2Drafter {
         conf = ctx.buffer(length: Self.blocks.max()! * 4)
         logits = ctx.buffer(length: (B - 1) * vocab * 4)
         dtok = ctx.buffer(length: B * 4)
+        draftHead = try lmHead.flatMap { h in
+            guard h.bits == 8 else { return nil }
+            guard h.gs == 64 && h.K % 64 == 0 else {
+                throw SafetensorsError.format("8-bit lm_head without groups of 64")
+            }
+            return DenseQ.requantize(h, bits: 4, device: d)
+        }
         vq = VQMV(ctx)
         loadSeconds = Date().timeIntervalSince(t0)
     }
 
     public var weightBytes: Int {
-        layers.reduce(fc.bytes + (hproj?.bytes ?? 0) + (pred?.length ?? 0) + (succ?.length ?? 0)) {
+        layers.reduce(
+            fc.bytes + (hproj?.bytes ?? 0) + (pred?.length ?? 0) + (succ?.length ?? 0) + (draftHead?.bytes ?? 0)
+        ) {
             $0 + $1.qkv.bytes + $1.o.bytes + $1.gu.bytes + $1.down.bytes + ($1.aproj?.bytes ?? 0)
                 + ($1.mproj?.bytes ?? 0)
         }
@@ -223,7 +268,7 @@ public final class DFlash2Drafter {
     private func params(_ l: Layer, P: Int = 0, nvalid: Int = 0, pos0: Int = 0) -> DAttnParams {
         DAttnParams(
             P: UInt32(P), nvalid: UInt32(nvalid), pos0: UInt32(pos0), C: UInt32(Self.chunkKeys),
-            nsplit: UInt32(Self.splits(l)), scale: 1 / Float(128).squareRoot(), eps: eps, theta: theta,
+            nsplit: UInt32(Self.splits(l)), scale: 1 / Float(headDim).squareRoot(), eps: eps, theta: theta,
             block: UInt32(block), win: UInt32(l.window), slots: UInt32(l.slots))
     }
 
@@ -267,13 +312,16 @@ public final class DFlash2Drafter {
         func write(_ kc: MTLBuffer, _ vt: MTLBuffer, _ l: Layer, rows n: Int) throws {
             var p = params(l, nvalid: nvalid, pos0: pos0)
             p.dyn = state == nil ? 0 : 1
-            e.setComputePipelineState(try ctx.pipeline("dctx_write"))
+            e.setComputePipelineState(try ctx.pipeline("dctx_write" + kernelSuffix))
             for (i, b) in [kvout, l.kn, kc, vt].enumerated() { e.setBuffer(b, offset: 0, index: i) }
             e.setBytes(&p, length: MemoryLayout<DAttnParams>.size, index: 4)
             e.setBuffer(state ?? kvout, offset: 0, index: 5)
+            // k | v biases: past the q part of q | k | v.
+            e.setBuffer(l.qkvBias ?? kvout, offset: l.qkvBias == nil ? 0 : qHeads * headDim * 2, index: 6)
+            e.setBuffer(ropeTab ?? kvout, offset: 0, index: 7)
             e.dispatchThreadgroups(
-                MTLSize(width: 16, height: n, depth: 1), threadsPerThreadgroup: MTLSize(width: 128, height: 1, depth: 1)
-            )
+                MTLSize(width: 16, height: n, depth: 1),
+                threadsPerThreadgroup: MTLSize(width: headDim, height: 1, depth: 1))
         }
         for (j, l) in layers.enumerated() {
             try lin(e, x: enc, l.kv, y: kvout, rows: rows)
@@ -286,6 +334,9 @@ public final class DFlash2Drafter {
             try write(l.kc, l.vt, l, rows: nvalid)
         }
     }
+
+    /// Suffix of the attention kernels of this drafter's head (yy_model.metal `DATTN_INST`).
+    var kernelSuffix: String { headDim == 64 ? "_h64" : "" }
 
     /// Whole (bit-exact) copy of a ring buffer.
     private func copyRing(_ e: MTLComputeCommandEncoder, _ src: MTLBuffer, _ dst: MTLBuffer) throws {
@@ -333,7 +384,7 @@ public final class DFlash2Drafter {
             }
         }
         let st = state ?? dtok
-        let B = block, tg128 = MTLSize(width: 128, height: 1, depth: 1)
+        let B = block, tgHD = MTLSize(width: headDim, height: 1, depth: 1), G = qHeads / 8
         try S("embed") { e in
             try embed.encodeEmbed(ctx, e, tok: dtok, outF: x, rows: B)
             if embedScale != 1 {
@@ -356,25 +407,30 @@ public final class DFlash2Drafter {
             }
             try S("qkv") { try lin($0, x: v1 ? xn : a, l.qkv, y: qkv, rows: B) }
             try S("attn") { e in
-                e.setComputePipelineState(try ctx.pipeline("dattn_prework"))
+                e.setComputePipelineState(try ctx.pipeline("dattn_prework" + kernelSuffix))
                 for (i, b) in [qkv, l.qn, l.kn, q, l.kc, l.vt].enumerated() { e.setBuffer(b, offset: 0, index: i) }
                 e.setBytes(&p, length: MemoryLayout<DAttnParams>.size, index: 6)
                 e.setBuffer(st, offset: 0, index: 7)
-                e.dispatchThreadgroups(MTLSize(width: 48, height: B, depth: 1), threadsPerThreadgroup: tg128)
-                e.setComputePipelineState(try ctx.pipeline("dattn_nax"))
+                e.setBuffer(l.qkvBias ?? qkv, offset: 0, index: 8)
+                e.setBuffer(ropeTab ?? qkv, offset: 0, index: 9)
+                e.dispatchThreadgroups(MTLSize(width: qHeads + 16, height: B, depth: 1), threadsPerThreadgroup: tgHD)
+                e.setComputePipelineState(try ctx.pipeline("dattn_nax" + kernelSuffix))
                 for (i, b) in [q, l.kc, l.vt, opart, ml].enumerated() { e.setBuffer(b, offset: 0, index: i) }
                 e.setBytes(&p, length: MemoryLayout<DAttnParams>.size, index: 5)
                 e.setBuffer(st, offset: 0, index: 6)
-                // 16 query rows (4 heads × 4 block rows) per threadgroup.
+                // 16 query rows (G heads × 16 / G block rows) per threadgroup.
                 e.dispatchThreadgroups(
-                    MTLSize(width: Int(p.nsplit), height: B / 4, depth: 8), threadsPerThreadgroup: tg128)
-                e.setComputePipelineState(try ctx.pipeline("dattn_reduce"))
+                    MTLSize(width: Int(p.nsplit), height: G * B / 16, depth: 8), threadsPerThreadgroup: tgHD)
+                e.setComputePipelineState(try ctx.pipeline("dattn_reduce" + kernelSuffix))
                 for (i, b) in [opart, ml, attn].enumerated() { e.setBuffer(b, offset: 0, index: i) }
                 e.setBytes(&p, length: MemoryLayout<DAttnParams>.size, index: 3)
-                e.dispatchThreadgroups(MTLSize(width: 4 * B, height: 8, depth: 1), threadsPerThreadgroup: tg128)
+                e.dispatchThreadgroups(MTLSize(width: G * B, height: 8, depth: 1), threadsPerThreadgroup: tgHD)
             }
             if v1 {
-                try S("o") { try lin($0, x: attn, l.o, y: x, rows: B, accumulate: true) }
+                try S("o") { e in
+                    try lin(e, x: attn, l.o, y: x, rows: B, accumulate: true)
+                    if let ob = l.oBias { try addBias(e, ob) }
+                }
             } else {
                 try S("o") { try lin($0, x: attn, l.o, y: y, rows: B) }
                 try S("conv") { try conv($0, finish: true, y, base: l.abase!, x) }
@@ -405,9 +461,10 @@ public final class DFlash2Drafter {
         try S("norm") { try norm($0, x, fnorm, hid, rows: B) }
         // 6-bit lm_head (Flash-Next): the same NAX path as the big model's head (FlashParts, nax6).
         // With qmv6m (7 rows) it cost 8.7 ms per round; it changes the order of the sums of the draft logits.
-        if lmHead.bits == 6 { vq.nax6 = true }
-        try S("lm_head") { try vq.encode($0, x: hid, xOffset: H * 2, lmHead, y: logits, rows: B - 1) }
-        var V = UInt32(lmHead.N)
+        let head = draftHead ?? lmHead
+        if head.bits == 6 { vq.nax6 = true }
+        try S("lm_head") { try vq.encode($0, x: hid, xOffset: H * 2, head, y: logits, rows: B - 1) }
+        var V = UInt32(head.N)
         try S("topk") { e in
             e.setComputePipelineState(try ctx.pipeline("topk16_rows"))
             e.setBuffer(logits, offset: 0, index: 0)
@@ -462,6 +519,18 @@ public final class DFlash2Drafter {
                 MTLSize(width: 1, height: 1, depth: 1), threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
         }
         return cur
+    }
+
+    /// The o_proj bias (bf16 [H]) added to the block's fp32 rows `x`.
+    private func addBias(_ e: MTLComputeCommandEncoder, _ bias: MTLBuffer) throws {
+        var n = UInt32(H)
+        e.setComputePipelineState(try ctx.pipeline("dbias_add"))
+        e.setBuffer(x, offset: 0, index: 0)
+        e.setBuffer(bias, offset: 0, index: 1)
+        e.setBytes(&n, length: 4, index: 2)
+        e.dispatchThreads(
+            MTLSize(width: block * H, height: 1, depth: 1),
+            threadsPerThreadgroup: MTLSize(width: 256, height: 1, depth: 1))
     }
 
     /// `logitsPost` on the top-16 values of the draft rows (`cval`), with the same kernel and order as the big model's

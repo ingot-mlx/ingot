@@ -33,7 +33,8 @@ import MetalLab
         else { throw UsageError("missing or unreadable \(gpath)") }
         let prompts = try promptNames.map { try promptIds(repoRoot.path + "/ref/out/prompts-toy/\($0).json") }
         let maxCtx = (prompts.map(\.count).max() ?? 0) + n + 64
-        let hasDrafter = try cfg.requiredSpec.hasDrafter
+        // The toy's drafter as gen takes it (toy-gptoss's too, whose family has none by default).
+        let drDir = try resolvedDrafterDir(dir, cfg, toyPack: true), hasDrafter = drDir != nil
         let plan = try memoryPlan(
             dir: dir, cfg: cfg, device: ctx.device, options: genMemOptions(maxCtx: maxCtx, drafter: hasDrafter))
         let m = try HybridModel(
@@ -45,7 +46,7 @@ import MetalLab
                 e.bench.copyPolicyUntimed = true  // like gen --golden-logits
                 return e
             }())
-        let dr = hasDrafter ? try resolvedDrafterDir(dir, cfg, toyPack: false).map { try openDrafter(ctx, $0, m) } : nil
+        let dr = try drDir.map { try openDrafter(ctx, $0, m) }
         let marker = (try? BPETokenizer(directory: dir))?.encode("<|im_start|>assistant\n").map { UInt32($0) } ?? []
         print(
             "loaded \(name): hidden \(ctx.dims.hidden), head \(ctx.dims.attnHD), \(ctx.dims.attnQH) q × "

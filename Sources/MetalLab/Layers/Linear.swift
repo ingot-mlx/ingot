@@ -539,6 +539,21 @@ extension DenseQ {
         return quantizeAffine(N: N, K: K, device: device, bits: bits) { bf16ToFloat(src[$0]) }
     }
 
+    /// A 4- or 8-bit matrix (groups of 64) dequantized and quantized again to `bits` (an 8-bit lm_head to 4 bits for
+    /// a drafter's proposals): w = scale·q + bias in fp32, then the same affine quantization.
+    public static func requantize(_ m: DenseQ, bits: Int, device: MTLDevice) -> DenseQ {
+        precondition((m.bits == 4 || m.bits == 8) && m.gs == 64 && m.K % 64 == 0)
+        let mask = UInt32((1 << m.bits) - 1), per = 32 / m.bits, gpr = m.K / 64
+        nonisolated(unsafe) let w = UnsafePointer(m.w.contents().bindMemory(to: UInt32.self, capacity: m.N * m.K / per))
+        nonisolated(unsafe) let s = UnsafePointer(m.s.contents().bindMemory(to: UInt16.self, capacity: m.N * gpr))
+        nonisolated(unsafe) let b = UnsafePointer(m.b.contents().bindMemory(to: UInt16.self, capacity: m.N * gpr))
+        let sb = m.bits
+        return quantizeAffine(N: m.N, K: m.K, device: device, bits: bits) { i in
+            let g = i / 64, q = (w[i / per] >> UInt32(sb * (i % per))) & mask
+            return bf16ToFloat(s[g]) * Float(q) + bf16ToFloat(b[g])
+        }
+    }
+
     /// The same from an fp32 [N, K] matrix (the fp32 router of LFM2.5-8B: to 8 bits at load).
     public static func quantize(f32 src: UnsafePointer<Float>, N: Int, K: Int, device: MTLDevice, bits: Int) -> DenseQ {
         nonisolated(unsafe) let src = src
