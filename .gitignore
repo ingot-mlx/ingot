@@ -1,0 +1,14 @@
+.build/
+.swiftpm/
+ref/.venv/
+ref/out/
+*.npy
+.DS_Store
+__pycache__/
+# Model weights and Python bytecode must never be committed
+*.safetensors
+*.gguf
+*.pyc
+*.npz
+*.bin
+.env

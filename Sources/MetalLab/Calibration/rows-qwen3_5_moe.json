@@ -1,0 +1,13 @@
+{
+  "family": "qwen3_5_moe",
+  "about": "Verification rows chosen by the DFlash2 drafter's confidence (spec_rows_choose). Platt scaling per depth 0, 1, 2, >= 3, calibrated on 16 prompts (6,425 anchors; simulated without recalibrating: +7.9 % with another drafter). Cost: ms per round with k = 2..8 rows per tokens in the cache, measured with a microbenchmark of the verification rows (masked, rows 8,7,6,5,4,3,2) on this model on an M6, with isotonic regression.",
+  "platt": [[1.074, 0.366], [1.046, -0.099], [1.045, -0.170], [0.996, -0.234]],
+  "cost": [
+    {"ctx": 629, "ms": [20.13, 22.60, 24.48, 25.94, 27.76, 29.86, 32.64]},
+    {"ctx": 3187, "ms": [20.50, 22.43, 24.53, 26.84, 28.66, 29.00, 31.80]},
+    {"ctx": 11900, "ms": [21.57, 23.81, 24.86, 27.00, 28.99, 30.85, 31.23]},
+    {"ctx": 22840, "ms": [21.75, 24.15, 25.92, 27.36, 28.75, 31.56, 32.40]}
+  ],
+  "kmin": 2,
+  "kmax": 8
+}

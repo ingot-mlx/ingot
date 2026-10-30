@@ -1,0 +1,4 @@
+# shellcheck for scripts/**/*.sh (run by .github/workflows/lint.yml).
+# scripts/ci/*.sh are sourced by scripts/ci.sh, not run alone: they have no shebang, and the sourced paths are variables.
+shell=bash
+disable=SC1091

@@ -1,0 +1,15 @@
+# Ruff for the Python in ref/ and scripts/ (run by .github/workflows/lint.yml).
+# Real-bug rules: pycodestyle errors E4/E7/E9, pyflakes F and bugbear B. Import order, modernisation and formatting
+# are not enforced (several scripts change sys.path or set the environment before importing).
+extend-exclude = ["ref/out", "ref/.venv"]
+target-version = "py311"
+
+[lint]
+select = ["E4", "E7", "E9", "F", "B"]
+ignore = [
+    "E702",  # `a; b` on one line: the dense style of the reference scripts
+    "E731",  # `f = lambda ...` for one-line local helpers
+    "E741",  # single-letter names (l, O, I) follow the notation of the formulas
+    "B905",  # zip() without strict=: the pairs are cut to the shorter on purpose, or equal by construction
+    "B008",  # call in a default argument: serve_check.py's asyncio_dir default is evaluated once, on purpose
+]

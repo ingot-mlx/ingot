@@ -1,0 +1,422 @@
+{
+ "format": "glm47",
+ "tools": [
+  {
+   "type": "function",
+   "function": {
+    "name": "bash",
+    "description": "Ejecuta una orden de shell.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "command": {
+       "type": "string",
+       "description": "La orden"
+      },
+      "timeout": {
+       "type": "integer",
+       "description": "Segundos"
+      }
+     },
+     "required": [
+      "command"
+     ]
+    }
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "read",
+    "description": "Lee un fichero (UTF-8, «comillas»).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "string"
+      },
+      "offset": {
+       "type": "number",
+       "default": 0.5
+      },
+      "flags": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "path"
+     ]
+    }
+   }
+  }
+ ],
+ "spans": [
+  {
+   "name": "turn1",
+   "prompt_tail": ">Mira qué hay en /tmp y cuenta los ficheros.<|assistant|><think>",
+   "text": "Necesito usar bash.</think>Voy a listarlo.<tool_call>bash<arg_key>command</arg_key><arg_value>ls /tmp | wc -l</arg_value><arg_key>timeout</arg_key><arg_value>10</arg_value></tool_call>",
+   "expected": {
+    "reasoning": "Necesito usar bash.",
+    "content": "Voy a listarlo.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "ls /tmp | wc -l",
+       "timeout": 10
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls /tmp | wc -l",
+      "timeout": 10
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn2",
+   "prompt_tail": "servation|><tool_response>42</tool_response><|assistant|><think>",
+   "text": "Ahora leo uno.</think><tool_call>read<arg_key>path</arg_key><arg_value>/tmp/a.txt</arg_value></tool_call><tool_call>read<arg_key>path</arg_key><arg_value>/tmp/b.txt</arg_value><arg_key>flags</arg_key><arg_value>[\"x\", \"y\"]</arg_value></tool_call>",
+   "expected": {
+    "reasoning": "Ahora leo uno.",
+    "content": "",
+    "calls": [
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/a.txt"
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/b.txt",
+       "flags": [
+        "x",
+        "y"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/a.txt"
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/b.txt",
+      "flags": [
+       "x",
+       "y"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn3",
+   "prompt_tail": "e><tool_response>contenido B</tool_response><|assistant|><think>",
+   "text": "Ya está.</think>Hay 42 ficheros.",
+   "expected": {
+    "reasoning": "Ya está.",
+    "content": "Hay 42 ficheros.",
+    "calls": []
+   },
+   "mlx": []
+  },
+  {
+   "name": "awkward",
+   "prompt_tail": ">Mira qué hay en /tmp y cuenta los ficheros.<|assistant|><think>",
+   "text": "Pienso \"algo\".\nDos líneas.</think><tool_call>bash<arg_key>command</arg_key><arg_value>echo \"hola, {mundo}\" > f.txt\ncat f.txt</arg_value><arg_key>timeout</arg_key><arg_value>5</arg_value></tool_call><tool_call>read<arg_key>path</arg_key><arg_value>/tmp/«x» y.txt</arg_value><arg_key>offset</arg_key><arg_value>1.5</arg_value><arg_key>flags</arg_key><arg_value>[\"a\", \"b c\"]</arg_value></tool_call>",
+   "expected": {
+    "reasoning": "Pienso \"algo\".\nDos líneas.",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+       "timeout": 5
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/«x» y.txt",
+       "offset": 1.5,
+       "flags": [
+        "a",
+        "b c"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+      "timeout": 5
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/«x» y.txt",
+      "offset": 1.5,
+      "flags": [
+       "a",
+       "b c"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn1-nothink",
+   "prompt_tail": "Mira qué hay en /tmp y cuenta los ficheros.<|assistant|></think>",
+   "text": "Voy a listarlo.<tool_call>bash<arg_key>command</arg_key><arg_value>ls /tmp | wc -l</arg_value><arg_key>timeout</arg_key><arg_value>10</arg_value></tool_call>",
+   "expected": {
+    "reasoning": "",
+    "content": "Voy a listarlo.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "ls /tmp | wc -l",
+       "timeout": 10
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls /tmp | wc -l",
+      "timeout": 10
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn2-nothink",
+   "prompt_tail": "ervation|><tool_response>42</tool_response><|assistant|></think>",
+   "text": "<tool_call>read<arg_key>path</arg_key><arg_value>/tmp/a.txt</arg_value></tool_call><tool_call>read<arg_key>path</arg_key><arg_value>/tmp/b.txt</arg_value><arg_key>flags</arg_key><arg_value>[\"x\", \"y\"]</arg_value></tool_call>",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/a.txt"
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/b.txt",
+       "flags": [
+        "x",
+        "y"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/a.txt"
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/b.txt",
+      "flags": [
+       "x",
+       "y"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn3-nothink",
+   "prompt_tail": "><tool_response>contenido B</tool_response><|assistant|></think>",
+   "text": "Hay 42 ficheros.",
+   "expected": {
+    "reasoning": "",
+    "content": "Hay 42 ficheros.",
+    "calls": []
+   },
+   "mlx": []
+  },
+  {
+   "name": "awkward-nothink",
+   "prompt_tail": "Mira qué hay en /tmp y cuenta los ficheros.<|assistant|></think>",
+   "text": "<tool_call>bash<arg_key>command</arg_key><arg_value>echo \"hola, {mundo}\" > f.txt\ncat f.txt</arg_value><arg_key>timeout</arg_key><arg_value>5</arg_value></tool_call><tool_call>read<arg_key>path</arg_key><arg_value>/tmp/«x» y.txt</arg_value><arg_key>offset</arg_key><arg_value>1.5</arg_value><arg_key>flags</arg_key><arg_value>[\"a\", \"b c\"]</arg_value></tool_call>",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+       "timeout": 5
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/«x» y.txt",
+       "offset": 1.5,
+       "flags": [
+        "a",
+        "b c"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+      "timeout": 5
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/«x» y.txt",
+      "offset": 1.5,
+      "flags": [
+       "a",
+       "b c"
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "hard": [
+  {
+   "name": "text-around",
+   "text": "Texto antes.<tool_call>bash<arg_key>command</arg_key><arg_value>ls -la\necho \"x\"</arg_value><arg_key>timeout</arg_key><arg_value>30</arg_value></tool_call>Texto después.",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls -la\necho \"x\"",
+      "timeout": 30
+     }
+    }
+   ]
+  },
+  {
+   "name": "two-calls",
+   "text": "<tool_call>read<arg_key>path</arg_key><arg_value>/a</arg_value></tool_call><tool_call>read<arg_key>path</arg_key><arg_value>/b</arg_value><arg_key>flags</arg_key><arg_value>[\"x\", \"y\"]</arg_value></tool_call>",
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/a"
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/b",
+      "flags": [
+       "x",
+       "y"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "unclosed",
+   "text": "Miro.<tool_call>bash<arg_key>command</arg_key><arg_value>pwd</arg_value>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "pwd"
+     }
+    }
+   ]
+  },
+  {
+   "name": "number-as-string",
+   "text": "<tool_call>bash<arg_key>command</arg_key><arg_value>42</arg_value><arg_key>timeout</arg_key><arg_value>7</arg_value></tool_call>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "42",
+      "timeout": 7
+     }
+    }
+   ]
+  },
+  {
+   "name": "newlines-between",
+   "text": "<tool_call>read\n<arg_key>path</arg_key>\n<arg_value>/x</arg_value>\n<arg_key>offset</arg_key>\n<arg_value>2.5</arg_value>\n</tool_call>",
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/x",
+      "offset": 2.5
+     }
+    }
+   ]
+  },
+  {
+   "name": "reasoning-then-call",
+   "text": "Razono.</think><tool_call>bash<arg_key>command</arg_key><arg_value>ls</arg_value></tool_call>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls"
+     }
+    }
+   ]
+  },
+  {
+   "name": "trailing-newline",
+   "text": "<tool_call>bash<arg_key>command</arg_key><arg_value>cat > f.py <<EOF\nprint(1)\nEOF\n</arg_value><arg_key>timeout</arg_key><arg_value>\n7\n</arg_value></tool_call>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "cat > f.py <<EOF\nprint(1)\nEOF",
+      "timeout": 7
+     }
+    }
+   ]
+  }
+ ]
+}

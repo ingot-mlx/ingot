@@ -1,0 +1,399 @@
+{
+ "format": "atem",
+ "tools": [
+  {
+   "type": "function",
+   "function": {
+    "name": "bash",
+    "description": "Ejecuta una orden de shell.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "command": {
+       "type": "string",
+       "description": "La orden"
+      },
+      "timeout": {
+       "type": "integer",
+       "description": "Segundos"
+      }
+     },
+     "required": [
+      "command"
+     ]
+    }
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "read",
+    "description": "Lee un fichero (UTF-8, «comillas»).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "string"
+      },
+      "offset": {
+       "type": "number",
+       "default": 0.5
+      },
+      "flags": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "path"
+     ]
+    }
+   }
+  }
+ ],
+ "spans": [
+  {
+   "name": "turn1",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|eot|><|start|>assistant",
+   "text": " to=self<|message|>Necesito usar bash.<|eom|><|start|>assistant to=bash<|message|><atem:function_calls>\n<atem:invoke name=\"bash\">\n<atem:parameter name=\"command\">ls /tmp | wc -l</atem:parameter>\n<atem:parameter name=\"timeout\">10</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "expected": {
+    "reasoning": "Necesito usar bash.",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "ls /tmp | wc -l",
+       "timeout": 10
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls /tmp | wc -l",
+      "timeout": 10
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn2",
+   "prompt_tail": "l_output name=\"bash\">\n42\n</tool_output><|eot|><|start|>assistant",
+   "text": " to=self<|message|>Ahora leo uno.<|eom|><|start|>assistant to=read<|message|><atem:function_calls>\n<atem:invoke name=\"read\">\n<atem:parameter name=\"path\">/tmp/a.txt</atem:parameter>\n</atem:invoke>\n</atem:function_calls><|eom|><|start|>assistant to=read<|message|><atem:function_calls>\n<atem:invoke name=\"read\">\n<atem:parameter name=\"path\">/tmp/b.txt</atem:parameter>\n<atem:parameter name=\"flags\">[\"x\", \"y\"]</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "expected": {
+    "reasoning": "Ahora leo uno.",
+    "content": "",
+    "calls": [
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/a.txt"
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/b.txt",
+       "flags": [
+        "x",
+        "y"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/a.txt"
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/b.txt",
+      "flags": [
+       "x",
+       "y"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn3",
+   "prompt_tail": "name=\"read\">\ncontenido B\n</tool_output><|eot|><|start|>assistant",
+   "text": " to=self<|message|>Ya está.<|eom|><|start|>assistant to=user<|message|>Hay 42 ficheros.",
+   "expected": {
+    "reasoning": "Ya está.",
+    "content": "Hay 42 ficheros.",
+    "calls": []
+   },
+   "mlx": []
+  },
+  {
+   "name": "awkward",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|eot|><|start|>assistant",
+   "text": " to=self<|message|>Pienso \"algo\".\nDos líneas.<|eom|><|start|>assistant to=bash<|message|><atem:function_calls>\n<atem:invoke name=\"bash\">\n<atem:parameter name=\"command\">echo \"hola, {mundo}\" > f.txt\ncat f.txt</atem:parameter>\n<atem:parameter name=\"timeout\">5</atem:parameter>\n</atem:invoke>\n</atem:function_calls><|eom|><|start|>assistant to=read<|message|><atem:function_calls>\n<atem:invoke name=\"read\">\n<atem:parameter name=\"path\">/tmp/«x» y.txt</atem:parameter>\n<atem:parameter name=\"offset\">1.5</atem:parameter>\n<atem:parameter name=\"flags\">[\"a\", \"b c\"]</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "expected": {
+    "reasoning": "Pienso \"algo\".\nDos líneas.",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+       "timeout": 5
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/«x» y.txt",
+       "offset": 1.5,
+       "flags": [
+        "a",
+        "b c"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+      "timeout": 5
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/«x» y.txt",
+      "offset": 1.5,
+      "flags": [
+       "a",
+       "b c"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn1-nothink",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|eot|><|start|>assistant",
+   "text": " to=bash<|message|><atem:function_calls>\n<atem:invoke name=\"bash\">\n<atem:parameter name=\"command\">ls /tmp | wc -l</atem:parameter>\n<atem:parameter name=\"timeout\">10</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "ls /tmp | wc -l",
+       "timeout": 10
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls /tmp | wc -l",
+      "timeout": 10
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn2-nothink",
+   "prompt_tail": "l_output name=\"bash\">\n42\n</tool_output><|eot|><|start|>assistant",
+   "text": " to=read<|message|><atem:function_calls>\n<atem:invoke name=\"read\">\n<atem:parameter name=\"path\">/tmp/a.txt</atem:parameter>\n</atem:invoke>\n</atem:function_calls><|eom|><|start|>assistant to=read<|message|><atem:function_calls>\n<atem:invoke name=\"read\">\n<atem:parameter name=\"path\">/tmp/b.txt</atem:parameter>\n<atem:parameter name=\"flags\">[\"x\", \"y\"]</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/a.txt"
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/b.txt",
+       "flags": [
+        "x",
+        "y"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/a.txt"
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/b.txt",
+      "flags": [
+       "x",
+       "y"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn3-nothink",
+   "prompt_tail": "name=\"read\">\ncontenido B\n</tool_output><|eot|><|start|>assistant",
+   "text": " to=user<|message|>Hay 42 ficheros.",
+   "expected": {
+    "reasoning": "",
+    "content": "Hay 42 ficheros.",
+    "calls": []
+   },
+   "mlx": []
+  },
+  {
+   "name": "awkward-nothink",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|eot|><|start|>assistant",
+   "text": " to=bash<|message|><atem:function_calls>\n<atem:invoke name=\"bash\">\n<atem:parameter name=\"command\">echo \"hola, {mundo}\" > f.txt\ncat f.txt</atem:parameter>\n<atem:parameter name=\"timeout\">5</atem:parameter>\n</atem:invoke>\n</atem:function_calls><|eom|><|start|>assistant to=read<|message|><atem:function_calls>\n<atem:invoke name=\"read\">\n<atem:parameter name=\"path\">/tmp/«x» y.txt</atem:parameter>\n<atem:parameter name=\"offset\">1.5</atem:parameter>\n<atem:parameter name=\"flags\">[\"a\", \"b c\"]</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+       "timeout": 5
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/«x» y.txt",
+       "offset": 1.5,
+       "flags": [
+        "a",
+        "b c"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+      "timeout": 5
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/«x» y.txt",
+      "offset": 1.5,
+      "flags": [
+       "a",
+       "b c"
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "hard": [
+  {
+   "name": "reasoning-call",
+   "text": " to=self<|message|>Pienso.<|eom|><|start|>assistant to=bash<|message|><atem:function_calls>\n<atem:invoke name=\"bash\">\n<atem:parameter name=\"command\">ls -la</atem:parameter>\n<atem:parameter name=\"timeout\">30</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls -la",
+      "timeout": 30
+     }
+    }
+   ]
+  },
+  {
+   "name": "two-invokes",
+   "text": " to=read<|message|><atem:function_calls>\n<atem:invoke name=\"read\">\n<atem:parameter name=\"path\">/a</atem:parameter>\n</atem:invoke>\n<atem:invoke name=\"read\">\n<atem:parameter name=\"path\">/b</atem:parameter>\n<atem:parameter name=\"flags\">[\"x\"]</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/a"
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/b",
+      "flags": [
+       "x"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "unclosed",
+   "text": " to=bash<|message|><atem:function_calls>\n<atem:invoke name=\"bash\">\n<atem:parameter name=\"command\">pwd</atem:parameter>\n",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "pwd"
+     }
+    }
+   ]
+  },
+  {
+   "name": "number-as-string",
+   "text": " to=bash<|message|><atem:function_calls>\n<atem:invoke name=\"bash\">\n<atem:parameter name=\"command\">42</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": 42
+     }
+    }
+   ]
+  },
+  {
+   "name": "spaces-kept",
+   "text": " to=bash<|message|><atem:function_calls>\n<atem:invoke name=\"bash\">\n<atem:parameter name=\"command\">  echo \"a\"\n</atem:parameter>\n</atem:invoke>\n</atem:function_calls>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "echo \"a\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "answer",
+   "text": " to=self<|message|>Breve.<|eom|><|start|>assistant to=user<|message|>Hola, ¿qué tal?",
+   "mlx": []
+  }
+ ]
+}

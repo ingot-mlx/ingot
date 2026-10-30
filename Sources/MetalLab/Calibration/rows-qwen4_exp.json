@@ -1,0 +1,62 @@
+{
+  "family": "qwen4_exp",
+  "about": "Verification rows for Qwen3.8-Flash-Next-lab-Q2: Platt scaling from lab-dev rowscal (8 prompts of prompts-fn-es x 256 tokens, 1997 samples); cost = wall-clock ms per round measured with lab-dev gen --spec-rows k (2, 3, 4, 5, 6, 8; 7 interpolated), 14 GB expert cache, vnax kernels: it includes the wait for the missing experts from the SSD (~5 ms per extra row), which rowscal does not see (it repeats the same round). 16K: the 4K one + 4 ms (estimated, not measured).",
+  "platt": [
+    [
+      1.008,
+      0.577
+    ],
+    [
+      1.144,
+      0.256
+    ],
+    [
+      0.664,
+      0.358
+    ],
+    [
+      1.057,
+      -0.097
+    ]
+  ],
+  "cost": [
+    {
+      "ctx": 800,
+      "ms": [
+        64.4,
+        70.5,
+        74.6,
+        79.0,
+        82.8,
+        86.0,
+        89.1
+      ]
+    },
+    {
+      "ctx": 3300,
+      "ms": [
+        63.9,
+        70.0,
+        75.7,
+        79.8,
+        84.1,
+        87.4,
+        90.6
+      ]
+    },
+    {
+      "ctx": 12000,
+      "ms": [
+        67.9,
+        74.0,
+        79.7,
+        83.8,
+        88.1,
+        91.4,
+        94.6
+      ]
+    }
+  ],
+  "kmin": 2,
+  "kmax": 8
+}

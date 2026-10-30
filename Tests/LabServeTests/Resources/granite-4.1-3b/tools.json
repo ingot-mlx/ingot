@@ -1,0 +1,275 @@
+{
+ "format": "hermes",
+ "tools": [
+  {
+   "type": "function",
+   "function": {
+    "name": "bash",
+    "description": "Ejecuta una orden de shell.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "command": {
+       "type": "string",
+       "description": "La orden"
+      },
+      "timeout": {
+       "type": "integer",
+       "description": "Segundos"
+      }
+     },
+     "required": [
+      "command"
+     ]
+    }
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "read",
+    "description": "Lee un fichero (UTF-8, «comillas»).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "string"
+      },
+      "offset": {
+       "type": "number",
+       "default": 0.5
+      },
+      "flags": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "path"
+     ]
+    }
+   }
+  }
+ ],
+ "spans": [
+  {
+   "name": "turn1",
+   "prompt_tail": "cheros.<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>",
+   "text": "Voy a listarlo.\n<tool_call>\n{\"name\": \"bash\", \"arguments\": {\"command\": \"ls /tmp | wc -l\", \"timeout\": 10}}\n</tool_call>",
+   "expected": {
+    "reasoning": "",
+    "content": "Voy a listarlo.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "ls /tmp | wc -l",
+       "timeout": 10
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls /tmp | wc -l",
+      "timeout": 10
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn2",
+   "prompt_tail": "sponse><|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>",
+   "text": "<tool_call>\n{\"name\": \"read\", \"arguments\": {\"path\": \"/tmp/a.txt\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"read\", \"arguments\": {\"path\": \"/tmp/b.txt\", \"flags\": [\"x\", \"y\"]}}\n</tool_call>",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/a.txt"
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/b.txt",
+       "flags": [
+        "x",
+        "y"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/a.txt"
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/b.txt",
+      "flags": [
+       "x",
+       "y"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "turn3",
+   "prompt_tail": "sponse><|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>",
+   "text": "Hay 42 ficheros.",
+   "expected": {
+    "reasoning": "",
+    "content": "Hay 42 ficheros.",
+    "calls": []
+   },
+   "mlx": []
+  },
+  {
+   "name": "awkward",
+   "prompt_tail": "cheros.<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>",
+   "text": "<tool_call>\n{\"name\": \"bash\", \"arguments\": {\"command\": \"echo \\\"hola, {mundo}\\\" > f.txt\\ncat f.txt\", \"timeout\": 5}}\n</tool_call>\n<tool_call>\n{\"name\": \"read\", \"arguments\": {\"path\": \"/tmp/«x» y.txt\", \"offset\": 1.5, \"flags\": [\"a\", \"b c\"]}}\n</tool_call>",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+       "timeout": 5
+      }
+     },
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/«x» y.txt",
+       "offset": 1.5,
+       "flags": [
+        "a",
+        "b c"
+       ]
+      }
+     }
+    ]
+   },
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+      "timeout": 5
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/tmp/«x» y.txt",
+      "offset": 1.5,
+      "flags": [
+       "a",
+       "b c"
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "hard": [
+  {
+   "name": "text-around",
+   "text": "Antes.\n<tool_call>\n{\"name\": \"bash\", \"arguments\": {\"command\": \"ls -la\\necho \\\"x\\\"\", \"timeout\": 30}}\n</tool_call>\nDespués.",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls -la\necho \"x\"",
+      "timeout": 30
+     }
+    }
+   ]
+  },
+  {
+   "name": "two-calls",
+   "text": "<tool_call>\n{\"name\": \"read\", \"arguments\": {\"path\": \"/a\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"read\", \"arguments\": {\"path\": \"/b\", \"flags\": [\"x\"]}}\n</tool_call>",
+   "mlx": [
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/a"
+     }
+    },
+    {
+     "name": "read",
+     "arguments": {
+      "path": "/b",
+      "flags": [
+       "x"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "name": "unclosed",
+   "text": "<tool_call>\n{\"name\": \"bash\", \"arguments\": {\"command\": \"pwd\"}}",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "pwd"
+     }
+    }
+   ]
+  },
+  {
+   "name": "arguments-string",
+   "text": "<tool_call>\n{\"name\": \"bash\", \"arguments\": \"{\\\"command\\\": \\\"ls\\\"}\"}\n</tool_call>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls"
+     }
+    }
+   ]
+  },
+  {
+   "name": "number-as-string",
+   "text": "<tool_call>\n{\"name\": \"bash\", \"arguments\": {\"command\": 42, \"timeout\": \"7\"}}\n</tool_call>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": 42,
+      "timeout": "7"
+     }
+    }
+   ]
+  },
+  {
+   "name": "reasoning-opened",
+   "text": "<think>\nPienso.\n</think>\n\n<tool_call>\n{\"name\": \"bash\", \"arguments\": {\"command\": \"ls\"}}\n</tool_call>",
+   "mlx": [
+    {
+     "name": "bash",
+     "arguments": {
+      "command": "ls"
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,193 @@
+{
+ "format": "harmony",
+ "tools": [
+  {
+   "type": "function",
+   "function": {
+    "name": "bash",
+    "description": "Ejecuta una orden de shell.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "command": {
+       "type": "string",
+       "description": "La orden"
+      },
+      "timeout": {
+       "type": "integer",
+       "description": "Segundos"
+      }
+     },
+     "required": [
+      "command"
+     ]
+    }
+   }
+  },
+  {
+   "type": "function",
+   "function": {
+    "name": "read",
+    "description": "Lee un fichero (UTF-8, «comillas»).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "string"
+      },
+      "offset": {
+       "type": "number",
+       "default": 0.5
+      },
+      "flags": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      }
+     },
+     "required": [
+      "path"
+     ]
+    }
+   }
+  }
+ ],
+ "spans": [
+  {
+   "name": "turn1",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|end|><|start|>assistant",
+   "text": "<|channel|>analysis<|message|>Necesito usar bash.<|end|><|start|>assistant to=functions.bash<|channel|>commentary json<|message|>{\"command\": \"ls /tmp | wc -l\", \"timeout\": 10}",
+   "expected": {
+    "reasoning": "Necesito usar bash.",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "ls /tmp | wc -l",
+       "timeout": 10
+      }
+     }
+    ]
+   },
+   "mlx": null
+  },
+  {
+   "name": "turn2",
+   "prompt_tail": "ant<|channel|>commentary<|message|>\"42\"<|end|><|start|>assistant",
+   "text": "<|channel|>analysis<|message|>Ahora leo uno.<|end|><|start|>assistant to=functions.read<|channel|>commentary json<|message|>{\"path\": \"/tmp/a.txt\"}",
+   "expected": {
+    "reasoning": "Ahora leo uno.",
+    "content": "",
+    "calls": [
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/a.txt"
+      }
+     }
+    ]
+   },
+   "mlx": null
+  },
+  {
+   "name": "awkward",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|end|><|start|>assistant",
+   "text": "<|channel|>analysis<|message|>Pienso \"algo\".\nDos líneas.<|end|><|start|>assistant to=functions.bash<|channel|>commentary json<|message|>{\"command\": \"echo \\\"hola, {mundo}\\\" > f.txt\\ncat f.txt\", \"timeout\": 5}",
+   "expected": {
+    "reasoning": "Pienso \"algo\".\nDos líneas.",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+       "timeout": 5
+      }
+     }
+    ]
+   },
+   "mlx": null
+  },
+  {
+   "name": "answer",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|end|><|start|>assistant",
+   "text": "<|channel|>analysis<|message|>Ya está.<|end|><|start|>assistant<|channel|>final<|message|>Hay 42 ficheros.",
+   "expected": {
+    "reasoning": "Ya está.",
+    "content": "Hay 42 ficheros.",
+    "calls": []
+   },
+   "mlx": null
+  },
+  {
+   "name": "turn1-nothink",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|end|><|start|>assistant",
+   "text": "<|channel|>analysis<|message|>Voy a listarlo.<|end|><|start|>assistant to=functions.bash<|channel|>commentary json<|message|>{\"command\": \"ls /tmp | wc -l\", \"timeout\": 10}",
+   "expected": {
+    "reasoning": "Voy a listarlo.",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "ls /tmp | wc -l",
+       "timeout": 10
+      }
+     }
+    ]
+   },
+   "mlx": null
+  },
+  {
+   "name": "turn2-nothink",
+   "prompt_tail": "ant<|channel|>commentary<|message|>\"42\"<|end|><|start|>assistant",
+   "text": " to=functions.read<|channel|>commentary json<|message|>{\"path\": \"/tmp/a.txt\"}",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "read",
+      "arguments": {
+       "path": "/tmp/a.txt"
+      }
+     }
+    ]
+   },
+   "mlx": null
+  },
+  {
+   "name": "awkward-nothink",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|end|><|start|>assistant",
+   "text": " to=functions.bash<|channel|>commentary json<|message|>{\"command\": \"echo \\\"hola, {mundo}\\\" > f.txt\\ncat f.txt\", \"timeout\": 5}",
+   "expected": {
+    "reasoning": "",
+    "content": "",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "command": "echo \"hola, {mundo}\" > f.txt\ncat f.txt",
+       "timeout": 5
+      }
+     }
+    ]
+   },
+   "mlx": null
+  },
+  {
+   "name": "answer-nothink",
+   "prompt_tail": " qué hay en /tmp y cuenta los ficheros.<|end|><|start|>assistant",
+   "text": "<|channel|>final<|message|>Hay 42 ficheros.",
+   "expected": {
+    "reasoning": "",
+    "content": "Hay 42 ficheros.",
+    "calls": []
+   },
+   "mlx": null
+  }
+ ],
+ "hard": []
+}
