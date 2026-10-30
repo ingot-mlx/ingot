@@ -29,15 +29,20 @@ package func planMachine(device: MTLDevice?) -> MachineInfo {
 }
 
 /// The drafter the memory plan counts (and lab serve, lab run and lab info use): resolvedDrafterDir with the toy's
-/// `drafter/` (no generated toy has one now), or nil if the drafter cannot be found (the plan goes without it). A drafter that does not fit
+/// `drafter/`, or nil if the drafter cannot be found (the plan goes without it). A drafter that does not fit
 /// (--drafter or the pack's) is an error.
 package func plannedDrafterDir(_ dir: URL, _ cfg: ModelConfig) throws -> URL? {
     do { return try resolvedDrafterDir(dir, cfg, toyPack: true) } catch SafetensorsError.io(_) { return nil }
 }
 
 /// Plan for `dir` on this machine (or the simulated one). Prints it and throws `MemoryPlanError` if it does not fit.
-package func memoryPlan(dir: URL, cfg: ModelConfig, device: MTLDevice?, options: MemoryOptions) throws -> MemoryPlan {
-    let fp = try plannedFootprint(dir: dir, cfg: cfg, drafterDir: try plannedDrafterDir(dir, cfg))
+/// `loading` (lab serve, lab run): a default drafter missing from the cache is a load error that says how to get it
+/// (without --drafter none), not a plan without drafter; lab plan and lab-dev go on without it.
+package func memoryPlan(
+    dir: URL, cfg: ModelConfig, device: MTLDevice?, options: MemoryOptions, loading: Bool = false
+) throws -> MemoryPlan {
+    let dd = loading ? try resolvedDrafterDir(dir, cfg, toyPack: true) : try plannedDrafterDir(dir, cfg)
+    let fp = try plannedFootprint(dir: dir, cfg: cfg, drafterDir: dd)
     let m = planMachine(device: device)
     let plan = try MemoryPlanner.plan(machine: m, model: fp, options: options)
     print(plan.describe(), terminator: "")

@@ -30,7 +30,8 @@ hf download LiquidAI/LFM2.5-8B-A1B-MLX-4bit # 4.8 GB; goes to the Hugging Face c
 ```
 
 `lab` never downloads anything: `--model` is a directory or an `org/repo` already in the Hugging Face cache
-(`HF_HUB_CACHE`, default `~/.cache/huggingface/hub`). When the server prints its memory plan and starts listening, from
+(`HF_HUB_CACHE`, default `~/.cache/huggingface/hub`), and so is a family's default drafter (table of families): if it is
+missing, `lab serve` and `lab run` stop with the `hf download` line that gets it (or run with `--drafter none`). When the server prints its memory plan and starts listening, from
 another terminal:
 
 ```sh
@@ -58,7 +59,7 @@ fit.
 | Qwen3.8-27B (15.1 GB) | no | 16K · no drafter | 64K · drafter | 256K · drafter |
 | LFM2.5-24B-A2B (13.6 GB)\* | no | 128K | 128K | 128K |
 | Gemma 4 26B-A4B (14.2 GB) | no | 64K · drafter | 256K · drafter | 256K · drafter |
-| gpt-oss-20b MXFP4-Q8 (12.1 GB) | no | 128K | 128K | 128K |
+| gpt-oss-20b MXFP4-Q8 (12.1 GB) | no | 128K · drafter | 128K · drafter | 128K · drafter |
 | GLM-4.7-Flash (17.0 GB) | no | no | 99K | 198K |
 | LFM2.5-8B-A1B (4.8 GB)\* | 125K | 125K | 125K | 125K |
 
@@ -69,8 +70,8 @@ and gives the expert cache all the memory left after 64K of context, a 0.25 GB p
 (exact, but slower than in memory: the more cache, the faster). Only the Qwen3.6 MoE family can do it (Flash-Next
 always does). `--expert-cache-gb X` sets the cache by hand, and then the plan fits the rest around it. If a Mac reports
 less GPU memory than assumed, fewer rows fit and the expert cache is smaller: with 10.7 GB of GPU memory on a 16 GB
-Mac, 3.7 GB (`lab plan --mem-limit-gb 16 --rws-gb 10.7`); with 16 GB on a 24 GB Mac, 9.0 GB, and only gpt-oss-20b (32K)
-and LFM2.5-8B-A1B fit without SSD experts (`lab plan --mem-limit-gb 24 --rws-gb 16`).
+Mac, 3.7 GB (`lab plan --mem-limit-gb 16 --rws-gb 10.7`); with 16 GB on a 24 GB Mac, 9.0 GB, and only gpt-oss-20b (64K,
+without its drafter) and LFM2.5-8B-A1B fit without SSD experts (`lab plan --mem-limit-gb 24 --rws-gb 16`).
 
 ### Plan a model before downloading it
 
@@ -108,7 +109,7 @@ in the Hugging Face cache.
 ```
 
 It listens on `127.0.0.1:8090` by default (`--host`, `--port`); `--name` is the model id the API reports. One model per
-process, with its DFlash2 drafter when the family has one (`--drafter none` turns it off).
+process, with its DFlash2 or DFlash v1 drafter when the family has one (`--drafter none` turns it off).
 
 - **Memory plan:** without options, the context, prefix cache, snapshots, prefill chunk and drafter are chosen from the
   Mac's memory (`recommendedMaxWorkingSetSize` and physical memory) and the model's footprint (read from `config.json`
@@ -169,7 +170,7 @@ names what is missing, never a silent fallback.
 | LFM3 (`lfm3`) | LFM3-1.7B (`lfm3`) | `LiquidAI/LFM3-1.7B-MLX-8bit` | none |
 | Granite (`granite`) | Granite 4.1 3B (`granite`) | `mlx-community/granite-4.1-3b-4bit` with the tokenizer files of `ibm-granite/granite-4.1-3b` | none |
 | Gemma 4 (`gemma4`) | Gemma 4 E2B (`gemma4`) | `mlx-community/gemma-4-e2b-it-4bit`; also the 26B-A4B and the 31B | `z-lab/gemma-4-26B-A4B-it-DFlash` (DFlash v1) on the 26B-A4B; none on the others |
-| gpt-oss (`gpt_oss`) | gpt-oss-20b (`gptoss`) | `mlx-community/gpt-oss-20b-MXFP4-Q8` | none |
+| gpt-oss (`gpt_oss`) | gpt-oss-20b (`gptoss`) | `mlx-community/gpt-oss-20b-MXFP4-Q8` | `z-lab/gpt-oss-20b-DFlash` (DFlash v1, 0.77 GB loaded) on the 20b; none on the 120b |
 | Nemotron-H (`nemotron_h`) | Nemotron 3 Nano 4B (`nemotron`) | `mlx-community/NVIDIA-Nemotron-3-Nano-4B-4bit` | none |
 | GLM-4.7-Flash (`glm4_moe_lite`) | GLM-4.7-Flash (`glm`) | `mlx-community/GLM-4.7-Flash-4bit` with `lm_head` re-quantized to 8 bits from `zai-org/GLM-4.7-Flash` | none |
 | Muse Glimmer (`muse_glimmer`) | Muse Glimmer 30B (`muse`) | `mlx-community/Muse-Glimmer-30B-4bit` (text tower only) | `incoai/Muse-Glimmer-30B-DFlash2` |

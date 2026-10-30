@@ -27,7 +27,9 @@ template, without reasoning; the CI's Gemma 4), the bench golden `gemma-4-26b-a4
 reasoning; written without a drafter (the greedy does not depend on it; z-lab's DFlash v1 is its default drafter);
 the weights are kept outside the repo), and `gpt-oss-20b-MXFP4-Q8` (`mlx-community`, revision `773a7da77e56`, prompts
 `ref/out/prompts-gptoss` from `ref/prompts.py --fixed-now` (its template prints the date) with the default template,
-`Reasoning: medium`; mlx-lm reference through `ref/yarn_ref.py`; the weights are kept outside the repo), and
+`Reasoning: medium`; mlx-lm reference through `ref/yarn_ref.py`; written without a drafter (the greedy does not depend
+on it; z-lab's DFlash v1 is its default drafter, so `--real gptoss` compares it with the speculative decode and no
+longer with mlx-lm's greedy); the weights are kept outside the repo), and
 `NVIDIA-Nemotron-3-Nano-4B-4bit` (`mlx-community`, revision `c4d79ba1901d`, prompts `ref/out/prompts-nemotron` with
 the default template, reasoning on (the prompt ends in `<think>\n`); Nemotron-H's CI model, kept locally), `GLM-4.7-Flash-4bit-h8` (our conversion: `mlx-community/GLM-4.7-Flash-4bit` revision `1454cffb1a21` with `lm_head` re-quantized at 8 bits (affine, g64)
 from `zai-org/GLM-4.7-Flash` bf16 revision `7dd20894a642` by a short script (load the bf16 model, quantize only `lm_head` with `mlx.core.quantize` at 8 bits, group size 64, and write it over the 4-bit checkpoint's `lm_head` tensors), because the 4-bit

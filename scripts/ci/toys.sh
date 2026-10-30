@@ -204,11 +204,12 @@ toy_muse_ring() {
 # LAB_AT_ROPETAB), q|k|v|o biases, no QK-norm, and the MoE with router and expert biases, swiglu_oai and MXFP4 experts
 # (LAB_MXFP4). Its toy drafter is a DFlash v1 like z-lab's gpt-oss-20b-DFlash (MP-21 T1b: heads of 64 with q/k/v/o
 # biases and YaRN, the `_h64` kernel instances and dbias_add, and the 4-bit copy of the toy's 8-bit lm_head for the
-# drafts; 2 layers, sliding with the 2048 ring, which the 4K prompt wraps, then full with the 8192 one). gpt-oss runs
-# without a drafter by default, but every lab-dev check takes the toy's (resolve's toyPack), so gen compares the normal
-# decode with the speculative one against the golden (taken with the drafter), and toy-gen-gptoss-nodrafter the normal
-# decode with the chained one (tokens only). Its random drafter guesses nothing and the toy's replies have no copy
-# rounds, so reuse only reaches N+1 (as without a drafter, but with the drafter's ring and its rewind). The six steps: prefixcache adds entries at W − 1, W, W + 1 and
+# drafts; 2 layers, sliding with the 2048 ring, which the 4K prompt wraps, then full with the 8192 one). z-lab's drafter
+# is gpt-oss 20b's default (MP-21 T1d) and the toy runs with its own drafter/, so gen compares the normal decode with
+# the speculative one against the golden (taken with the drafter), and toy-gen-gptoss-nodrafter (--drafter none, the
+# other models of the family) the normal decode with the chained one (tokens only). Its random drafter guesses nothing
+# and the toy's replies have no copy rounds, so reuse only reaches N+1 (as without a drafter, but with the drafter's
+# ring and its rewind). The six steps: prefixcache adds entries at W − 1, W, W + 1 and
 # ring ± 64 (its step 7; ring 2304, so 2240 and 2368), and splitcheck cuts there too (attention only: no 64 alignment
 # needed) and at the drafter ring's 2047, 2048 and 2049.
 toy_gptoss() {
@@ -296,8 +297,8 @@ toy_rows() {
     run toy-rowscheck-muse "$LAB" rowscheck --model "$TOYDIR/toy-muse" --prompts 512
     negative granite toy-granite rowscheck --prompts 512
 }
-# The same drafter-less rowscheck, with --drafter none, for gpt-oss (its drafter is not the default) and for the
-# families whose small models run without a drafter:
+# The same drafter-less rowscheck, with --drafter none, for the families whose other models run without a drafter:
+# toy-gptoss (gpt-oss other than the 20b, or the 20b with --drafter none),
 # toy-gemma4 (Gemma 4 E2B, E4B and 31B), toy-qwen38-dense and toy-qwen36-moe (the small Qwen3.5 models, whose Qwen3.6
 # drafter is discarded, and the 27B or the MoE served without one: the copy rounds of decodeSpec). ~3-7 s each alone (gemma4's window of
 # 300 < 512 takes it over the ring). In the flash lane, to keep the fid lane from being the longest.

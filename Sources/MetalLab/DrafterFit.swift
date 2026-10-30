@@ -3,8 +3,8 @@ import Foundation
 // Whether a DFlash2 drafter fits a model, and which drafter a model runs with. The family's default drafter
 // (ModelSpec.defaultDrafter) is the one of its largest model: Qwen3.6-35B-A3B's for all of qwen35, which does not fit
 // Qwen3.5 0.8B (hidden 1024) and asks Qwen3.5 2B (24 layers) for layers 27, 32 and 37. Gemma 4's (z-lab's DFlash v1
-// of the 26B-A4B) is only the default for hidden 2816 (FamilyTraits.defaultDrafterHidden). Reading only config.json and
-// the safetensors headers: no weights, no GPU.
+// of the 26B-A4B) is only the default for hidden 2816 (FamilyTraits.defaultDrafterHidden), gpt-oss's (z-lab's of the
+// 20b) only for hidden 2880 and 24 layers. Reading only config.json and the safetensors headers: no weights, no GPU.
 
 extension DFlash2Drafter {
     /// Tensor present only in DFlash2 (the candidate selector); without it the drafter is DFlash v1.
@@ -78,14 +78,16 @@ extension DFlash2Drafter {
     /// The drafter a model runs with, or nil for none. In order:
     /// 1. `option` (`--drafter`) "none": nil;
     /// 2. `option` with a name or path: that one (an error if it does not fit);
-    /// 3. a family without drafter (LFM2, Granite, gpt-oss…): nil, except a toy (`metal_lab_toy`) with a `drafter/`
-    ///    when `toyPack` (lab serve and every lab-dev check: toy-gptoss's); a real pack's `drafter/` is then left out
-    ///    and `log` says so;
+    /// 3. a family without drafter (LFM2, Granite, Nemotron-H…): nil, except a toy (`metal_lab_toy`) with a `drafter/`
+    ///    when `toyPack` (lab serve and every lab-dev check); a real pack's `drafter/` is then left out and `log` says
+    ///    so;
     /// 4. the `drafter/` of the model pack (the 27B's, the toys'): that one (an error if it does not fit);
-    /// 5. none if the family's is not for this model (ModelSpec.defaultDrafter nil: Gemma 4 other than the 26B-A4B);
+    /// 5. none if the family's is not for this model (ModelSpec.defaultDrafter nil: Gemma 4 other than the 26B-A4B,
+    ///    gpt-oss other than the 20b);
     ///    it is not looked up;
     /// 6. the family's (ModelSpec.defaultDrafter; Qwen3.6's with no known family), located with `locate` (an error if
-    ///    it is not in the cache): that one if it fits; if not, nil and `log` gets the reason.
+    ///    it is not in the cache, saying how to download it): that one if it fits; if not, nil and `log` gets the
+    ///    reason.
     public static func resolve(
         modelDir: URL, config cfg: ModelConfig, option: String?, toyPack: Bool,
         locate: (String) throws -> URL = ModelPaths.resolve, log: (String) -> Void
@@ -113,7 +115,12 @@ extension DFlash2Drafter {
         } else {
             name = "incoai/Qwen3.6-35B-A3B-DFlash2"
         }
-        let d = try locate(name)
+        let d: URL
+        do { d = try locate(name) } catch SafetensorsError.io(let why) {
+            throw SafetensorsError.io(
+                "\(why): the default drafter of this model is missing; download it with `hf download \(name)` or run"
+                    + " with --drafter none")
+        }
         if let why = try mismatch(directory: d, hidden: cfg.hiddenSize, layers: cfg.numLayers) {
             log("default drafter \(name) does not fit this model (\(why)): running without drafter")
             return nil
