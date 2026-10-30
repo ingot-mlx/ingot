@@ -21,7 +21,7 @@ import MetalLab
     let (dir, cfg, ctx) = try loadModelFiles(model)
     // Context, drafter, snapshots, prefix cache and prefill chunk: whatever the user sets and the rest according to
     // the Mac's memory (MemPlan.swift; --mem-limit-gb simulates another Mac). If not even the minimum fits, it is not loaded.
-    let plan = try memoryPlan(dir: dir, cfg: cfg, device: ctx.device, options: memOptions())
+    let plan = try memoryPlan(dir: dir, cfg: cfg, device: ctx.device, options: memOptions(), loading: true)
     let useDrafter = plan.drafter
     let maxCtx = plan.context
     let t0 = Date()

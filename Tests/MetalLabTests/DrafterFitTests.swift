@@ -170,6 +170,34 @@ import Testing
         for name in ["gemma4-e2b", "gemma4-e4b", "gemma4-31b"] {
             #expect(try resolve(try t.dir(name, try Self.real(name))) == nil, "\(name)")
         }
+        // gpt-oss: z-lab's DFlash v1 by default only on the 20b (hidden 2880, 24 layers), an error that says how to
+        // download it if it is missing; a 120b-like config (36 layers) runs without one and does not look it up.
+        let oss20 = try t.dir("oss20", try Self.real("gpt-oss-20b"))
+        var oss120JSON = try Self.real("gpt-oss-20b")
+        oss120JSON["num_hidden_layers"] = 36
+        oss120JSON["layer_types"] = (0..<36).map { $0 % 2 == 0 ? "sliding_attention" : "full_attention" }
+        let oss120 = try t.dir("oss120", oss120JSON)
+        let ossV1: [String: Any] = [
+            "hidden_size": 2880, "num_target_layers": 24, "head_dim": 64, "num_attention_heads": 64,
+            "num_key_value_heads": 8, "attention_bias": true, "rope_theta": 150000, "block_size": 8,
+            "dflash_config": ["mask_token_id": 200000, "target_layer_ids": [1, 6, 11, 16, 21]] as [String: Any],
+        ]
+        let ossName = "z-lab/gpt-oss-20b-DFlash"
+        let ossDir = try t.dir("hf-oss", ossV1)
+        #expect(try ModelConfig(directory: oss20).spec?.defaultDrafter == ossName)
+        #expect(try ModelConfig(directory: oss120).spec?.defaultDrafter == nil)
+        do {
+            _ = try resolve(oss20)
+            Issue.record("a missing default drafter must be a load error")
+        } catch {
+            #expect("\(error)".contains("hf download \(ossName)") && "\(error)".contains("--drafter none"))
+        }
+        #expect(
+            try DFlash2Drafter.resolve(
+                modelDir: oss20, config: try ModelConfig(directory: oss20), option: nil, toyPack: true,
+                locate: { $0 == ossName ? ossDir : try locate($0) }, log: { _ in }) == ossDir)
+        #expect(try resolve(oss20, option: "none") == nil)
+        #expect(try resolve(oss120) == nil)
         // A drafter missing from the cache is still an error (lab plan and lab info go without it: plannedDrafterDir).
         let lost = try t.dir("lost", try Self.real("qwen3.6-35b-a3b"))
         #expect(throws: SafetensorsError.self) {

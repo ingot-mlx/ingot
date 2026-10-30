@@ -3948,7 +3948,7 @@
       "source" : "measured (lab serve, chunks of 2048\/1024)"
     },
     "calibrationName" : "gpt_oss",
-    "defaultDrafter" : null,
+    "defaultDrafter" : "z-lab\/gpt-oss-20b-DFlash",
     "expertLayout" : "unsupported",
     "family" : "gptOss",
     "ffnKinds" : [
@@ -3978,7 +3978,7 @@
       "moe"
     ],
     "fullShape" : null,
-    "hasDrafter" : "false",
+    "hasDrafter" : "true",
     "hasScaledRope" : "true",
     "int8Experts" : "false",
     "int8MinPos" : "1024",

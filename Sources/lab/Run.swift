@@ -41,7 +41,7 @@ import MetalLab
     mem.maxContext = mem.maxContext ?? (ids.count + maxTokens + 64)
     mem.prefixCacheBytes = 0
     mem.snapshots = 0
-    let plan = try memoryPlan(dir: dir, cfg: cfg, device: ctx.device, options: mem)
+    let plan = try memoryPlan(dir: dir, cfg: cfg, device: ctx.device, options: mem, loading: true)
     let m = try HybridModel(
         ctx: ctx, store: try SafetensorsStore(directory: dir), config: cfg, maxCtx: plan.context,
         chunkRows: plan.chunkRows,

@@ -25,7 +25,8 @@ text must not depend on whether a drafter was used or on how many rows a round v
   speculation of families without a drafter, and a draft tree on dense models in greedy (`TreeVerify.swift`).
 - A family's default drafter is only used if it matches the model (hidden size, target layers, heads);
   `--drafter none` works everywhere. Gemma 4's (z-lab's DFlash v1 for the 26B-A4B) is the default only for that
-  model's hidden size, and a missing one is a load error, as with Qwen3.6's.
+  model's hidden size, and gpt-oss's (z-lab's DFlash v1 for the 20b) only for the 20b's hidden size and layer count;
+  a missing one is a load error that says how to download it, as with Qwen3.6's.
 - DFlash v1 drafters (no candidate selector: argmax drafts, block 8) take as confidence that of the argmax over
   their top-16; with a family calibration (Gemma 4 26B-A4B, gpt-oss 20b) their rounds choose rows like DFlash2's,
   otherwise they verify the whole block.

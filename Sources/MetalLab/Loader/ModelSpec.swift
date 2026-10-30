@@ -107,10 +107,14 @@ public enum ModelFamily: String, Sendable, CaseIterable {
                 calibrationName: "gemma4", names: .gemma4, calibration: .gemma4,
                 defaultDrafter: "z-lab/gemma-4-26B-A4B-it-DFlash", defaultDrafterHidden: 2816, moeRouter: true,
                 ownRouterNorm: true)
+        // gpt-oss: z-lab's DFlash v1 of the 20b (heads of 64 with biases and YaRN, block 8, window 8K, rows from
+        // rows-gpt_oss.json), by default only with its hidden 2880 and 24 layers (the 120b, also hidden 2880, has 36:
+        // it runs without one and does not look it up); a toy's drafter/ goes first.
         case .gptOss:
             FamilyTraits(
-                calibrationName: "gpt_oss", names: .gptOss, calibration: .gptOss, moeRouter: true, moeBiases: true,
-                attnSinks: true)
+                calibrationName: "gpt_oss", names: .gptOss, calibration: .gptOss,
+                defaultDrafter: "z-lab/gpt-oss-20b-DFlash", defaultDrafterHidden: 2880, defaultDrafterLayers: 24,
+                moeRouter: true, moeBiases: true, attnSinks: true)
         case .nemotronH:
             FamilyTraits(
                 calibrationName: "nemotron_h", names: .nemotronH, calibration: .nemotronH, moeRouter: true,
@@ -143,6 +147,8 @@ struct FamilyTraits {
     /// The model hidden size `defaultDrafter` is for (nil = any): other models of the family run without a default
     /// drafter (their pack's `drafter/` still counts).
     var defaultDrafterHidden: Int?
+    /// The model layer count `defaultDrafter` is for (nil = any), like `defaultDrafterHidden`.
+    var defaultDrafterLayers: Int?
     /// Layout of the experts for reading them from the SSD (ExpertStream).
     var expertLayout = ExpertLayout.unsupported
     /// Lossy prefill (--int8 1): position from which the dense GEMMs run in rotated W8A8 (ModelSpec.int8MinPos).
@@ -211,7 +217,8 @@ public struct ModelSpec: Sendable {
     public let names: WeightNames
     public let expertLayout: ExpertLayout
     /// Whether the family has a drafter (the pack's `drafter/` is used) and which one is used if the pack has none
-    /// (`drafter/`; nil for the models of the family it is not for: Gemma 4 other than the 26B-A4B).
+    /// (`drafter/`; nil for the models of the family it is not for: Gemma 4 other than the 26B-A4B, gpt-oss other
+    /// than the 20b).
     public let hasDrafter: Bool
     public let defaultDrafter: String?
     public let calibration: FamilyCalibration
@@ -286,7 +293,10 @@ public struct ModelSpec: Sendable {
             router = nil
         }
         expertLayout = tr.expertLayout
-        defaultDrafter = tr.defaultDrafterHidden.map { $0 == cfg.hiddenSize } ?? true ? tr.defaultDrafter : nil
+        let draftFits =
+            (tr.defaultDrafterHidden.map { $0 == cfg.hiddenSize } ?? true)
+            && (tr.defaultDrafterLayers.map { $0 == cfg.numLayers } ?? true)
+        defaultDrafter = draftFits ? tr.defaultDrafter : nil
         hasDrafter = tr.defaultDrafter != nil
         calibration = tr.calibration
         int8MinPos = tr.int8MinPos
