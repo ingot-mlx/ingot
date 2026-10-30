@@ -2,8 +2,8 @@
 # Local continuous integration for ingot. Two modes that do not mix («toy es toy, real es
 # real»); the steps live in scripts/ci/{lib,static,toys,real,fidelity}.sh.
 #
-#   scripts/ci.sh --toy      the CI of every integration, with the toy models only (lab-dev toymodels, in
-#                            ~/.cache/metal-lab/toy; generated if missing or if the generator changes): the static part
+#   scripts/ci.sh --toy      the CI of every integration, with the toy models only (ingot-dev toymodels, in
+#                            ~/.cache/ingot/toy; generated if missing or if the generator changes): the static part
 #                            (API: exp and ref/api-surface.txt; build, release, no warnings; SwiftLint --strict, 0
 #                            warnings; formatting), swift test, the exactness regression of every toy (token golden and
 #                            logits fingerprints, reuse, prefixcache and splitcheck, also with INT8, and the negative
@@ -16,7 +16,7 @@
 #                            scripts/ci/real.sh: moe, dense, flash, lfm, granite, gemma4, gptoss, nemotron, glm, muse,
 #                            lfm3; all = every one), each with all its steps: gen --check (golden, and mlx-lm's greedy
 #                            for models without a drafter: the real fidelity), kvgrow on Flash-Next, reuse,
-#                            prefixcache (with lab serve's defaults: INT8 prefill on the MoE models, exact on the dense
+#                            prefixcache (with ingot serve's defaults: INT8 prefill on the MoE models, exact on the dense
 #                            ones) and rowscheck on the Heretic. No toys and no swift test; of the static part only
 #                            the release build that the steps run. Only when needed: a branch that touches what only
 #                            a real model covers, before rewriting ref/golden/, or to validate one model; `all` only
@@ -40,7 +40,7 @@
 # CI_PHASE=static|gpu (internal, for whoever coordinates the GPU externally, like an external CI wrapper; not a mode):
 # only the part before the GPU (static part or build, toy models, Python check) or only the GPU part of the same mode.
 # Exits with 1 as soon as a required step fails; the informative ones only warn.
-# METAL_LAB_MODELS (optional): directory with the calibrated models. With it, the tokenizer and chat-template tests
+# INGOT_MODELS (optional): directory with the calibrated models. With it, the tokenizer and chat-template tests
 # (TokenizerTemplateTests, ChatDialectTests) fail when a family's tokenizer repo is missing from the Hugging Face cache
 # (the failure says how to download it, without weights); without it they skip it.
 
@@ -81,8 +81,8 @@ fi
 SCRIPTS=scripts/ci
 . "$SCRIPTS/lib.sh"; . "$SCRIPTS/static.sh"; . "$SCRIPTS/toys.sh"; . "$SCRIPTS/real.sh"; . "$SCRIPTS/fidelity.sh"
 
-TOYDIR="${TOY_DIR:-$HOME/.cache/metal-lab/toy}"
-LAB=.build/release/lab-dev
+TOYDIR="${TOY_DIR:-$HOME/.cache/ingot/toy}"
+DEV=.build/release/ingot-dev
 
 REAL_TAGS=""
 if [ "$MODE" = real ]; then
@@ -99,8 +99,8 @@ if [ "$PHASE" != gpu ]; then
     if [ "$MODE" = toy ]; then
         ci_static
         # Toy models (CPU and disk; ~1 min the first time) and the fidelity Python.
-        step "toy models (lab-dev toymodels in $TOYDIR; no GPU)"
-        $LAB toymodels --out "$TOYDIR" > "$LOG_DIR/toymodels.log" 2>&1 \
+        step "toy models (ingot-dev toymodels in $TOYDIR; no GPU)"
+        $DEV toymodels --out "$TOYDIR" > "$LOG_DIR/toymodels.log" 2>&1 \
             || { tail -n 20 "$LOG_DIR/toymodels.log"; fail "toymodels (see $LOG_DIR/toymodels.log)"; }
         cat "$LOG_DIR/toymodels.log"
         ref_py_check

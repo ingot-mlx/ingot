@@ -9,7 +9,7 @@ Rounding quantization (mx.quantize, identical to mlx_lm.convert without calibrat
   - QSA indexer: plain BF16;
   - norms, conv, A_log and dt_bias: fp32 (exact from BF16).
 Norms stay zero-centered as in the checkpoint (the engine and mlx-vlm add 1); conv becomes [C, 4, 1].
-Writes model-0000i-of-0000n.safetensors, model.safetensors.index.json and config.json (with "metal_lab").
+Writes model-0000i-of-0000n.safetensors, model.safetensors.index.json and config.json (with "ingot").
 """
 import os
 import sys
@@ -100,7 +100,7 @@ cfg = json.load(open(cfgp))
 cfg['quantization'] = qcfg
 cfg['quantization_config'] = qcfg
 tc = cfg['text_config']
-cfg['metal_lab'] = {
+cfg['ingot'] = {
     'format': 1,
     'experts': {'file': 'experts.bin', 'kind': 'q2_0_planar', 'record_bytes': F.RECORD, 'payload_bytes': F.PAYLOAD,
                 'layers': F.LAYERS, 'experts': F.EXPERTS, 'hidden': F.HIDDEN, 'intermediate': F.INTER, 'group': F.GROUP,

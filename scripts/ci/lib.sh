@@ -26,7 +26,7 @@ test_timings() {
          $1 == "kcase-time" && NF == 3 { printf "kcase %s\t%s\n", $2, $3 }' "$1" >> "$TIMES"
 }
 
-# Lanes: in --toy the toys run in parallel lab-dev processes, all under the GPU already reserved by whoever launches
+# Lanes: in --toy the toys run in parallel ingot-dev processes, all under the GPU already reserved by whoever launches
 # the CI. It measures exactness (tokens, bit-exact logits), not speed, so sharing the GPU changes no result; the
 # timings per step come out longer than when run alone, and what counts is that of each lane. Every lane writes its
 # output to .build/ci/lane-NAME.out and its timings to lane-NAME.txt; ci.sh merges them when all have finished.

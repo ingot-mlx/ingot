@@ -1,12 +1,12 @@
 """Reference for the full pre_tokenizer (a Sequence of one or more Split steps and ByteLevel) and for the merge order of
-tokenizers, for LabServe. Writes Tests/LabServeTests/Resources/multisplit/{tokenizer.json,cases.json}.
+tokenizers, for IngotServe. Writes Tests/IngotServeTests/Resources/multisplit/{tokenizer.json,cases.json}.
 
 tokenizer.json is a tiny byte-level BPE (trained here with tokenizers) with the pre_tokenizer of Qwen3.6
 (froggeric/Qwen3.6-35B-A3B-Uncensored-Heretic-MLX-4bit: one Split and ByteLevel without regex) and, ahead of the other
 merges, the newline merges in LFM2.5 order (a freshly formed merge may rank below the one that formed it). cases.json
 gives the tokenizers ids for that pre_tokenizer and for variants: several Split steps in a row (hand written: digits,
 CJK runs, then gpt-oss's word expression), the other behaviors, invert, String patterns (Gemma's MergedWithPrevious on
-" ") and ByteLevel with prefix and expression (Granite). Variants that tokenizers does not load, or that LabServe does
+" ") and ByteLevel with prefix and expression (Granite). Variants that tokenizers does not load, or that IngotServe does
 not support (Digits, which no tier 1 family uses), go in "errors".
 
 Usage: uv run --no-project --with tokenizers==0.23.3 python -I ref/tok_multisplit_ref.py
@@ -17,7 +17,7 @@ import os
 
 from tokenizers import Tokenizer, models, pre_tokenizers, trainers
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Tests", "LabServeTests", "Resources", "multisplit")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Tests", "IngotServeTests", "Resources", "multisplit")
 # Qwen3.6's Split expression and gpt-oss's (o200k) word expression, from their tokenizer.json.
 QWEN36 = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?[\p{L}\p{M}]+|\p{N}| ?[^\s\p{L}\p{M}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+"
 O200K_WORDS = (r"[^\r\n\p{L}\p{N}]?[\p{Lu}\p{Lt}\p{Lm}\p{Lo}\p{M}]*[\p{Ll}\p{Lm}\p{Lo}\p{M}]+(?i:'s|'t|'re|'ve|'m|'ll|'d)?"

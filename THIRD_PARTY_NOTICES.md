@@ -14,7 +14,7 @@ included.
 
 ### Strata (Niko1221/Strata) — MIT, Copyright (c) 2026 Niko1221 and the Strata contributors
 
-- `Sources/MetalLab/CopySpec.swift`: `CopyIndex` and `CopyPolicy`. **Copied** (a near-literal translation from C++:
+- `Sources/Ingot/CopySpec.swift`: `CopyIndex` and `CopyPolicy`. **Copied** (a near-literal translation from C++:
   hash mix and constants, 4-way index, load bound, hit-rate priors, decay and thresholds of the policy).
 - Origin: `src/spec/suffix_drafter.cpp`, `suffix_drafter.hpp` and `src/spec/draft_policy.cpp` at commit `e88ee39`.
 - Notice: MIT text below ("Strata"). Strata's licence is MIT and has always been; the earlier comment in the source
@@ -22,14 +22,14 @@ included.
 
 ### MLX (ml-explore/mlx) — MIT, Copyright (c) 2023 Apple Inc.
 
-- **Copied:** `nax_coord` and `nax_mma2` in `Sources/MetalLab/Shaders/qmm_nax.metal` (from `steel/gemm/nax.h`, fragment
+- **Copied:** `nax_coord` and `nax_mma2` in `Sources/Ingot/Shaders/qmm_nax.metal` (from `steel/gemm/nax.h`, fragment
   coordinates and the 16×32×16 matmul; largely dictated by the hardware fragment layout) and `lab_fp4x2` in
-  `Sources/MetalLab/Shaders/qmm_nax_moe.metal` (from `fp_quantized.h` and `fp_quantized_nax.h`, one expression with the
+  `Sources/Ingot/Shaders/qmm_nax_moe.metal` (from `fp_quantized.h` and `fp_quantized_nax.h`, one expression with the
   masks and the 2^14 factor). Origin commit `7d2d94a`.
 - **Adapted:** `qmm_t_nax` in `qmm_nax.metal` (scheme of `quantized_nax.h`, `qmm_t_nax_tgp_impl`) and the mask trick of
-  `vload_x`, `vqdot` and `qmv_acc` in `Sources/MetalLab/Shaders/verify.metal` (from `quantized.h`, `load_vector` and
+  `vload_x`, `vqdot` and `qmv_acc` in `Sources/Ingot/Shaders/verify.metal` (from `quantized.h`, `load_vector` and
   `qdot`).
-- **Idea / format:** affine and mxfp4 quantization formats (`Sources/MetalLab/Loader/Quant.swift`, `qmm.metal`) and
+- **Idea / format:** affine and mxfp4 quantization formats (`Sources/Ingot/Loader/Quant.swift`, `qmm.metal`) and
   `steel_attention_nax` (`pattn64_i8` in `verify_attn_pf.metal`, which reuses `nax_coord` and `nax_mma2`).
 - The "0x6400" half-precision bit trick used in several kernels is **not** from MLX (it is not in MLX's tree); it is a
   well-known technique and carries no notice.
@@ -37,9 +37,9 @@ included.
 
 ### mlx-lm (ml-explore/mlx-lm) — MIT, Copyright (c) 2023 Apple Inc.
 
-- **Adapted:** YaRN frequencies in `Sources/MetalLab/Loader/RopeTable.swift` (`rope_utils.py`, commit `1f7057c`);
-  tool-call format detection in `Sources/LabServe/ChatDialect.swift` (`tokenizer_utils.py`, `_infer_tool_parser`, v0.32.2);
-  tool-call parsers in `Sources/LabServe/ToolCallBlocks.swift` and `HeaderChannels.swift` (`tool_parsers/glm47.py`,
+- **Adapted:** YaRN frequencies in `Sources/Ingot/Loader/RopeTable.swift` (`rope_utils.py`, commit `1f7057c`);
+  tool-call format detection in `Sources/IngotServe/ChatDialect.swift` (`tokenizer_utils.py`, `_infer_tool_parser`, v0.32.2);
+  tool-call parsers in `Sources/IngotServe/ToolCallBlocks.swift` and `HeaderChannels.swift` (`tool_parsers/glm47.py`,
   `json_tools.py`, `gemma4.py`, `muse_spark.py`, v0.32.2).
 - **Idea:** model semantics (router, `lfm2_moe`, group selection, proportional RoPE) in `qmm_nax_moe.metal`,
   `ab_moe_route.metal`, `yw_lfm.metal`, `ShortConv.swift` and `RopeTable.swift`. The Python tools under `ref/` import
@@ -48,7 +48,7 @@ included.
 
 ### splash (incoai/splash) — Apache-2.0 (no copyright line in its LICENSE; no NOTICE file)
 
-- **Adapted:** `Sources/LabServe/OutputParser.swift`, a modified Swift port of `server/output.py` at tag 1.3.2
+- **Adapted:** `Sources/IngotServe/OutputParser.swift`, a modified Swift port of `server/output.py` at tag 1.3.2
   (holding back partial tags, value conversion by schema, reasoning split, tool-call state machine). Design adapted
   (own code): `moe_group` in `qmm_nax_moe.metal` (`kernels/shared/moe.metal`) and the GDN "tape" in `verify.metal` and
   `Layers/GDN.swift` (`decode/gdn.metal`).
@@ -61,7 +61,7 @@ included.
 ### oMLX (jundot/omlx) — Apache-2.0, Copyright 2025 oMLX contributors (no NOTICE file)
 
 - **Adapted (design):** single-expert tiles with descriptors written on the GPU, `row_map`, SwiGLU in the epilogue, in
-  `Sources/MetalLab/Shaders/qmm_nax_moe.metal` (`patches/m5_gather_qmm_nax.py`, `moe_routes.py`, `quantized_moe.h`
+  `Sources/Ingot/Shaders/qmm_nax_moe.metal` (`patches/m5_gather_qmm_nax.py`, `moe_routes.py`, `quantized_moe.h`
   at v0.7.1rc1).
 - **Idea:** `verify.metal`, `Layers/GDN.swift`, `Engine.swift`.
 - Notice: as for splash.
@@ -69,7 +69,7 @@ included.
 ### TensorFold (ashhart/TensorFold) — Apache-2.0 from 0.6.0 (MIT up to 0.5.0)
 
 - **Adapted (design, at the border of idea):** the slot stack of `gdn_recur_tree` in
-  `Sources/MetalLab/Shaders/zt_tree.metal`, from `zig/kernels/metal/core/deltanet_slots.metal` (entered 2026-10-17,
+  `Sources/Ingot/Shaders/zt_tree.metal`, from `zig/kernels/metal/core/deltanet_slots.metal` (entered 2026-10-17,
   already under Apache-2.0). **Idea:** `zg_qsa.metal` (QSA).
 - Notice (Apache-2.0 §4a–d, applied out of prudence): licence copy in `LICENSES/Apache-2.0.txt`, a header line in
   `zt_tree.metal`, and the text of its NOTICE, reproduced here:
@@ -86,7 +86,7 @@ included.
 ### mlx-serve (ddalcu/mlx-serve) — MIT, Copyright (c) 2026 David Dalcu
 
 - **Adapted (protocol only, no code; Zig versus Swift/Metal):** the DFlash2 drafter protocol and shape in
-  `Sources/MetalLab/Drafter.swift` and `Shaders/yy_model.metal` (`src/dflash.zig`). **Idea:** fused qkv in
+  `Sources/Ingot/Drafter.swift` and `Shaders/yy_model.metal` (`src/dflash.zig`). **Idea:** fused qkv in
   `Layers/Linear.swift`. MIT text below, out of prudence.
 
 ### Chat template of the toy models
@@ -112,8 +112,8 @@ included.
 
 ## Model configurations and test fixtures
 
-`ref/toy/real/*.json` are trimmed `config.json` files (the key `metal_lab_real` records the source and date) and
-`Tests/LabServeTests/Resources/*/` hold chat-template outputs, token ids and special tokens of each tokenizer. They are
+`ref/toy/real/*.json` are trimmed `config.json` files (the key `ingot_real` records the source and date) and
+`Tests/IngotServeTests/Resources/*/` hold chat-template outputs, token ids and special tokens of each tokenizer. They are
 small factual data, not the models, and are included with attribution to the models they describe. Licence as stated on
 the original model card (checked on the Hugging Face API on 2026-10-29 or, for the first group, 2026-10-28):
 

@@ -1,5 +1,5 @@
 {
- "metal_lab_real": {
+ "ingot_real": {
   "source": "mlx-community/gpt-oss-20b-MXFP4-Q8 (revision 773a7da77e56…)",
   "note": "sin quantization ni quantization_config (expertos mxfp4 g32, el resto afín 8 bits g64)"
  },

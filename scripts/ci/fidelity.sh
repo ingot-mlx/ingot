@@ -9,21 +9,21 @@ ref_py_check() {
         || fail "--toy: missing the Python with mlx-lm (CI_REF_PY; see README, ref/.venv)"
 }
 
-# Fidelity of the toys against mlx-lm (the lab rule for a new model against its external reference): mlx-lm's
+# Fidelity of the toys against mlx-lm (the project's rule for a new model against its external reference): mlx-lm's
 # greedy (ref/gen_ref.py), its logits at those positions with fp32 activations (ref/logits_ref.py --f32) and
-# lab-dev kl --ref mlx-f32 with 64 forced positions. It passes with mean KL < 0.01. Against mlx-lm bf16 the toys do
+# ingot-dev kl --ref mlx-f32 with 64 forced positions. It passes with mean KL < 0.01. Against mlx-lm bf16 the toys do
 # not pass (the bf16 reference itself is noisy with random weights). The toy MoEs used to need an exception because of
 # their random router (clustered router logits: a bf16 rounding changed the top-8); with the router gain set to 4 in
 # toy-qwen36-moe (ToySpec.routerGain) it passes the normal limit and the exception was removed.
 # Flash-Next does not: mlx-lm has no qwen4_exp (its reference is ref/flashnext/harness.py, with mlx-vlm, by hand).
 # The mlx-lm reference (greedy ids and fp32 logits of 512 and 4K) depends only on its inputs, so it is kept in
 # $TOYDIR/fidref/TAG-KEY (its 36 Python runs were ~59 s of the fid lane in the CI, 28 s alone) and only the
-# engine side, lab-dev kl, runs every time. KEY hashes everything the reference reads: the toy (its .toy-stamp,
+# engine side, ingot-dev kl, runs every time. KEY hashes everything the reference reads: the toy (its .toy-stamp,
 # config.json and the size of its safetensors), the toy prompts 512 and 4K, every ref/*.py (gen_ref.py,
 # logits_ref.py, the wrappers and what they import), the mlx and mlx-lm versions of CI_REF_PY, WRAPS and N. Any change
 # recomputes it (36/36 files byte-identical to the cached ones when recomputed); CI_FID_REF_CACHE=0
 # recomputes it always and refreshes the cache. Not the mtime of the safetensors: the toys are a function of the
-# generator that .toy-stamp hashes (lab-dev toymodels --force twice gives the same bytes), and when two
+# generator that .toy-stamp hashes (ingot-dev toymodels --force twice gives the same bytes), and when two
 # branches with different generators take turns in the CI each one regenerates the shared toys, which with the mtime
 # in the key recomputed every reference each time (~40 s more in the fid lane). For the same reason a tag keeps
 # its FID_REF_KEEP most recently used entries (3), not only the last one: branches with different ref/*.py also take
@@ -87,7 +87,7 @@ fidelity() {
         done
         fid_ref_store "$tag" "$out" "$cache"
     fi
-    run "fid-$tag-kl" "$LAB" kl --ref mlx-f32 --model "$TOYDIR/$name" --prompts 512,4K --n "$n" --gen "$out"
+    run "fid-$tag-kl" "$DEV" kl --ref mlx-f32 --model "$TOYDIR/$name" --prompts 512,4K --n "$n" --gen "$out"
     for p in 512 4K; do
         kl=$(sed -n "s/^$p (.*mean over [0-9]* positions \([0-9.]*\),.*/\1/p" "$LOG_DIR/fid-$tag-kl.log")
         [ -n "$kl" ] || fail "fidelity of $tag: cannot find the mean KL of $p in $LOG_DIR/fid-$tag-kl.log"

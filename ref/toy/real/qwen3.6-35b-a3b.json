@@ -8,7 +8,7 @@
   248044
  ],
  "image_token_id": 248056,
- "metal_lab_real": {
+ "ingot_real": {
   "note": "sin vision_config; quantization con las capas plegadas en layers.*",
   "source": "~/Models/Qwen3.6-35B-A3B-Heretic-MLX-4bit-calib (MLX 4 bits calibrado del Heretic)"
  },

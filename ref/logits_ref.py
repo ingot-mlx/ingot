@@ -1,7 +1,7 @@
-"""mlx-lm reference logits to measure the lab's KL (lab-dev kl --ref mlx): last prompt position and n steps
+"""mlx-lm reference logits to measure ingot's KL (ingot-dev kl --ref mlx): last prompt position and n steps
 forced with mlx-lm's greedy (out/<gen>/<prompt>_mlx.json from gen_ref.py). Writes out/<gen>/<prompt>_logits.npy
 (fp32 [n + 1, V], mlx-lm's bf16 output converted). With --f32, the model with every activation in fp32 (the
-quantized weights do not change): precision reference to compare mlx-lm bf16 and the lab
+quantized weights do not change): precision reference to compare mlx-lm bf16 and ingot
 (out/<gen>/<prompt>_logits_f32.npy).
 
 Usage:

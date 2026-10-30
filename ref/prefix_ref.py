@@ -1,5 +1,5 @@
 """Last-position logits of several prefixes of a prompt with mlx-lm, in bf16 (as it runs) and with fp32 activations
-(precision reference), to measure the exactness of the lab engine prefill (lab-dev kl --ref mlx-prefix). Writes
+(precision reference), to measure the exactness of the ingot engine prefill (ingot-dev kl --ref mlx-prefix). Writes
 out/<gen>/<prompt>_prefixes.json (lengths), _prefix_bf16.npy and _prefix_f32.npy (fp32 [n, V]), and the bf16 KL.
 
 Usage:

@@ -1,4 +1,4 @@
-"""Reference with the lab's int8 KV cache emulated in mlx-lm: every K and V row that enters the cache is
+"""Reference with ingot's int8 KV cache emulated in mlx-lm: every K and V row that enters the cache is
 quantized and dequantized with the engine's scheme (vattn_prework_i8 in Shaders/verify_attn_nax.metal): symmetric,
 one fp32 scale per token and KV head, sc = amax / 127 (1 when amax = 0), q = clamp(rint(x / sc), -127, 127),
 x_hat = q * sc. K is taken after the QK norm and the RoPE (what mlx-lm hands to the cache) and quantized in the
@@ -29,7 +29,7 @@ kernels. SPEC is a '+'-separated list of:
 --kv8-group N is kept as an alias of --kv8-variant gN (unrotated).
 
 Usage:
-  .venv/bin/python kv8_ref.py logits_ref.py --f32 --model ~/.cache/metal-lab/toy/toy-granite --pdir prompts-toy ...
+  .venv/bin/python kv8_ref.py logits_ref.py --f32 --model ~/.cache/ingot/toy/toy-granite --pdir prompts-toy ...
   .venv/bin/python kv8_ref.py --kv8-variant hadk+g64 yarn_ref.py logits_ref.py --f32 --model .../toy-gptoss ...
   .venv/bin/python kv8_ref.py --selftest
 In-process (a driver that loads the model once): kv8_ref.install() (default "hadk"), then kv8_ref.set_variant(...) between runs;

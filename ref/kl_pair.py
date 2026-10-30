@@ -1,6 +1,6 @@
 """KL(A || B) between two logits files of the same shape ([rows, V], fp32; for example two _logits_f32.npy of
 logits_ref.py, [n + 1, V], whose row 0 is the last prompt position): mean, median, row 0, last row, max and equal
-top-1, with the same formula as lab-dev kl (natural log, terms with log p_A > -30). From a scratch script.
+top-1, with the same formula as ingot-dev kl (natural log, terms with log p_A > -30). From a scratch script.
 
 Usage:
   .venv/bin/python kl_pair.py out/gen-a/4K_logits_f32.npy out/gen-b/4K_logits_f32.npy "label" [--json out.jsonl]

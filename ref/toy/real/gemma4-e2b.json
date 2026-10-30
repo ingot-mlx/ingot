@@ -31,7 +31,7 @@
  },
  "image_token_id": 258880,
  "initializer_range": 0.02,
- "metal_lab_real": {
+ "ingot_real": {
   "note": "sin vision_config ni audio_config",
   "source": "mlx-community/gemma-4-e2b-it-4bit (revision 238767527555…)"
  },

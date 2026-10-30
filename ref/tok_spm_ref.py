@@ -1,11 +1,11 @@
-"""Reference for the SentencePiece-style BPE of LabServe (Gemma 3 and 4): a tiny tokenizer.json trained here with
+"""Reference for the SentencePiece-style BPE of IngotServe (Gemma 3 and 4): a tiny tokenizer.json trained here with
 tokenizers and set up like Gemma's (Replace(" "→"\u2581") normalizer, Split(" ", MergedWithPrevious), byte_fallback with
 the 256 <0xNN> tokens, unk with fuse_unk, Replace(\u2581→" ")+ByteFallback+Fuse decoder, non-normalized added tokens).
-Writes Tests/LabServeTests/Resources/spm/{tokenizer.json,cases.json}.
+Writes Tests/IngotServeTests/Resources/spm/{tokenizer.json,cases.json}.
 
 cases.json has, for that tokenizer and for variants (Prepend("\u2581") normalizer; no byte_fallback with unk fused, not
 fused, or no unk at all), the ids and decode of tokenizers for each text, and decode cases on hand-picked ids (runs of
-byte tokens that are not valid UTF-8, added tokens with \u2581). Variants LabServe must reject go in "errors".
+byte tokens that are not valid UTF-8, added tokens with \u2581). Variants IngotServe must reject go in "errors".
 
 Usage: uv run --no-project --with tokenizers==0.23.3 python -I ref/tok_spm_ref.py
 """
@@ -15,7 +15,7 @@ import os
 
 from tokenizers import Tokenizer, models, pre_tokenizers, trainers
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Tests", "LabServeTests", "Resources", "spm")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Tests", "IngotServeTests", "Resources", "spm")
 TEXTS = [
     "Hola, ¿qué tal? Él cogió el camión en Logroño.",
     "  leading and trailing  ",

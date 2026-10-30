@@ -1,4 +1,4 @@
-"""Where the next prompt stops matching the live state, from a `lab serve --dump-requests DIR` folder (no GPU).
+"""Where the next prompt stops matching the live state, from a `ingot serve --dump-requests DIR` folder (no GPU).
 
 For each request n that has a NNNN-output.json, the live state it leaves is prompt_ids + output_ids (the server keeps
 all but the last emitted token). The next request's prompt ids (its own NNNN-output.json) are compared with it:

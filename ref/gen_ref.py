@@ -1,8 +1,8 @@
-"""Reference greedy decoding with mlx-lm (bf16) to compare against the lab engine.
+"""Reference greedy decoding with mlx-lm (bf16) to compare against the ingot engine.
 
 Reads the ids from `out/prompts/<name>.json`, prefills in chunks and generates N tokens with argmax. Writes
 `out/gen-qwen36/<name>_mlx.json` (--out) with the generated ids (and, with --logits, the top1-top2 margin of each step, useful to
-explain where the lab engine diverges).
+explain where the ingot engine diverges).
 
 Usage:
   .venv/bin/python gen_ref.py --prompt chat --n 128
@@ -27,7 +27,7 @@ def main():
     ap.add_argument("--chunk", type=int, default=2048)
     ap.add_argument("--pdir", default="prompts", help="subdirectory of out/ with the prompts (prompts-lfm, prompts-q27)")
     ap.add_argument(
-        "--out", default="gen-qwen36", help="subdirectory of out/ for the result (gen is lab-dev gen's output)"
+        "--out", default="gen-qwen36", help="subdirectory of out/ for the result (gen is ingot-dev gen's output)"
     )
     a = ap.parse_args()
     ids = json.load(open(os.path.join(HERE, "out", a.pdir, f"{a.prompt}.json")))["ids"]

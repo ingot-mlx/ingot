@@ -1,6 +1,6 @@
 """Server references: Hugging Face tokenizer ids and transformers apply_chat_template text, to compare with the
-BPE tokenizer and the template (swift-jinja) of LabServe. Writes
-Tests/LabServeTests/Resources/<model>/{tok,chat,special}.json.
+BPE tokenizer and the template (swift-jinja) of IngotServe. Writes
+Tests/IngotServeTests/Resources/<model>/{tok,chat,special}.json.
 
 special.json: conversations with special tokens inside the content (a tool result with
 `<|im_end|><|im_start|>user`, etc.). The text is that of apply_chat_template, but the ids are not those of
@@ -159,7 +159,7 @@ def main():
     ap.add_argument("--model", default="~/Models/Qwen3.6-35B-A3B-Heretic-MLX-4bit-calib")
     a = ap.parse_args()
     tok = AutoTokenizer.from_pretrained(resolve(a.model))
-    out = os.path.join(HERE, "..", "Tests", "LabServeTests", "Resources", a.model.split("/")[-1])
+    out = os.path.join(HERE, "..", "Tests", "IngotServeTests", "Resources", a.model.split("/")[-1])
     os.makedirs(out, exist_ok=True)
     texts = list(TEXTS)
     corpus = "".join(open(f).read() for f in sorted(glob.glob(os.path.expanduser(

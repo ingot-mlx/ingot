@@ -1,6 +1,6 @@
 """Compares the engine greedy with the harness by forcing the same tokens (Flash-Next phase 0b).
 
-The engine (`lab-dev fncheck --emit DIR`) leaves its greedy and its logits (the last row of the prompt and each one-row round);
+The engine (`ingot-dev fncheck --emit DIR`) leaves its greedy and its logits (the last row of the prompt and each one-row round);
 the harness reads prompt + those tokens (`ids_tf.npy`) and gives the logits of the same positions. So, after a difference, the
 two still see the same context and can be compared position by position.
 

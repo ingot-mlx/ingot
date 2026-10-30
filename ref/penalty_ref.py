@@ -1,5 +1,5 @@
 """Reference greedy decoding with mlx-lm and penalties with vLLM/OpenAI semantics (no window), to compare against
-`lab serve`.
+`ingot serve`.
 
 Same as gen_ref.py (ids from `out/<pdir>/<name>.json`, prefill in chunks, argmax), but each step's logits (fp32) are
 penalized before the argmax, in the engine's order:
@@ -7,10 +7,10 @@ penalized before the argmax, in the engine's order:
   frequency over the generated tokens (- f per occurrence),
   presence over the generated tokens (- p once).
 mlx-lm's own processors (make_logits_processors) use a window of the last 20 tokens including the prompt; vLLM and
-lab serve use the whole text, so they are reimplemented here.
+ingot serve use the whole text, so they are reimplemented here.
 
-With --forced, runs the reference over the tokens lab serve gave (teacher forcing, see forced()).
-With --url, also asks `lab serve` (temperature 0, same penalties, the prompt text rebuilt as serve_check.py does)
+With --forced, runs the reference over the tokens ingot serve gave (teacher forcing, see forced()).
+With --url, also asks `ingot serve` (temperature 0, same penalties, the prompt text rebuilt as serve_check.py does)
 and prints the first divergence and the reference margin there. Never run both at once: --url only reads
 `out/<out>/<name>_mlx_pen.json` written by an earlier run.
 
@@ -88,15 +88,15 @@ def reference(a):
 
 
 def forced(a):
-    """Teacher forcing over the ids that lab serve returned (`<tag>_lab_serve.json`): at each position, the penalized
-    reference logits with lab's own history; reports where lab's token is not the reference argmax and by how much
-    (reference logit of its argmax minus that of lab's token)."""
+    """Teacher forcing over the ids that ingot serve returned (`<tag>_ingot_serve.json`): at each position, the penalized
+    reference logits with ingot's own history; reports where ingot's token is not the reference argmax and by how much
+    (reference logit of its argmax minus that of ingot's token)."""
     import mlx.core as mx
     from mlx_lm.utils import load
     from mlx_lm.models.cache import make_prompt_cache
 
     ids = json.load(open(os.path.join(HERE, "out", a.pdir, f"{a.prompt}.json")))["ids"]
-    got = json.load(open(os.path.join(HERE, "out", a.out, f"{tag(a)}_lab_serve.json")))["ids"]
+    got = json.load(open(os.path.join(HERE, "out", a.out, f"{tag(a)}_ingot_serve.json")))["ids"]
     model, _ = load(resolve(a.model))
     cache = make_prompt_cache(model)
     logits = None
@@ -114,7 +114,7 @@ def forced(a):
             diffs.append((i, round(float((x[best] - x[y]).item()), 4)))
         counts[y] = counts.get(y, 0) + 1
     worst = max((d for _, d in diffs), default=0.0)
-    print(f"{tag(a)} forced over {len(got)} lab tokens: {len(diffs)} not the reference argmax, worst gap {worst:.4f}"
+    print(f"{tag(a)} forced over {len(got)} ingot tokens: {len(diffs)} not the reference argmax, worst gap {worst:.4f}"
           + (f" at {[i for i, _ in diffs]}" if diffs else ""))
 
 
@@ -124,12 +124,12 @@ def compare(a):
     ref = json.load(open(os.path.join(HERE, "out", a.out, f"{tag(a)}_mlx_pen.json")))
     ref_prompt = json.load(open(os.path.join(HERE, "out", a.pdir, f"{a.prompt}.json")))["ids"]
     body = {"model": "x", "messages": [{"role": "user", "content": texts()[a.prompt]}],
-            "max_tokens": len(ref["ids"]), "temperature": 0, "lab_return_tokens": True, "min_p": 0,
+            "max_tokens": len(ref["ids"]), "temperature": 0, "ingot_return_tokens": True, "min_p": 0,
             "repetition_penalty": a.rep, "presence_penalty": a.pres, "frequency_penalty": a.freq}
     req = urllib.request.Request(a.url + "/v1/chat/completions", json.dumps(body).encode(),
                                  {"Content-Type": "application/json"})
     r = json.load(urllib.request.urlopen(req, timeout=900))
-    got, gp, want = r["lab_tokens"], r["lab_prompt_tokens"], ref["ids"]
+    got, gp, want = r["ingot_tokens"], r["ingot_prompt_tokens"], ref["ids"]
     k = min(len(got), len(want))
     div = next((i for i in range(k) if got[i] != want[i]), None)
     same_p = gp == ref_prompt
@@ -138,7 +138,7 @@ def compare(a):
     else:
         res = f"same {div} tokens, diverge at {div} (reference margin there {ref['margins'][div]:.4f})"
     print(f"{tag(a)}: prompt {len(gp)} tok ({'same' if same_p else 'DIFFERENT'} as prompts.py); {res}")
-    with open(os.path.join(HERE, "out", a.out, f"{tag(a)}_lab_serve.json"), "w") as f:
+    with open(os.path.join(HERE, "out", a.out, f"{tag(a)}_ingot_serve.json"), "w") as f:
         json.dump({"ids": got, "first_divergence": div}, f)
 
 
@@ -153,7 +153,7 @@ def main():
     ap.add_argument("--freq", type=float, default=0.0, help="frequency_penalty (0 = off)")
     ap.add_argument("--pdir", default="prompts", help="subdirectory of out/ with the prompts")
     ap.add_argument("--out", default="gen", help="subdirectory of out/ for the result")
-    ap.add_argument("--url", help="compare a running lab serve against the saved reference (no MLX)")
+    ap.add_argument("--url", help="compare a running ingot serve against the saved reference (no MLX)")
     ap.add_argument("--forced", action="store_true", help="teacher forcing over the ids saved by --url")
     a = ap.parse_args()
     if a.url:

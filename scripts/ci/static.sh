@@ -41,7 +41,7 @@ if [ "$DEADCODE" = 1 ]; then
 fi
 }
 
-# The release build (lab and lab-dev); --toy also fails on its warnings (ci_static).
+# The release build (ingot and ingot-dev); --toy also fails on its warnings (ci_static).
 ci_build() {
     step "build (release)"
     $CI_GPU_WRAP swift build -c release > "$LOG_DIR/build.log" 2>&1 || { grep -E 'error:' "$LOG_DIR/build.log" | head -20; fail "swift build"; }

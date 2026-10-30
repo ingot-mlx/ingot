@@ -1,5 +1,5 @@
 {
- "metal_lab_real": {
+ "ingot_real": {
   "source": "LiquidAI/LFM3-1.7B-MLX-8bit (revision ee7667f3cfccb2a41725f91820531823fcabc6b7)",
   "note": "without quantization/quantization_config (affine 8 bits g64 everywhere, no overrides); the other keys equal to those of the -MLX-4bit config (revision d0ca73dc)"
  },

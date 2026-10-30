@@ -1,4 +1,4 @@
-"""Spanish and multilingual prompts (lab-dev rowscal, rowscheck and Flash-Next prompts_fn.py) with non-English text.
+"""Spanish and multilingual prompts (ingot-dev rowscal, rowscheck and Flash-Next prompts_fn.py) with non-English text.
 
 Text of Spanish markdown pages (the files named in PAGES, read from --text-dir) trimmed to ~4K and ~16K tokens with a final
 question in Spanish, a programming task explained in Spanish and a short question. Qwen3.6 chat template
@@ -50,7 +50,7 @@ def main():
     corpus = "\n\n".join(open(os.path.join(os.path.expanduser(a.text_dir), p)).read() for p in PAGES)
     out = os.path.join(HERE, "out", a.out)
     os.makedirs(out, exist_ok=True)
-    prompts = {"chat": CHAT, "es-chat": CHAT, "es-code": CODE}   # chat: lab-dev gen warm-up
+    prompts = {"chat": CHAT, "es-chat": CHAT, "es-code": CODE}   # chat: ingot-dev gen warm-up
     # Texts of other kinds: English, code, Catalan and Chinese (another script).
     prompts.update(MULTI)
     for name, chars in TARGETS.items():

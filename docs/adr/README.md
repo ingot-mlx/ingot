@@ -11,4 +11,4 @@ it costs. A record is not edited when the decision changes: a new one supersedes
 | [0004](0004-family-tiers-and-two-mode-ci-on-toys-from-real-configs.md) | Tier-1 families get a toy and a real model in the CI; a `--toy` mode on every integration and `--real` only when needed. |
 | [0005](0005-exact-speculative-decoding-with-dflash2-and-gpu-chosen-rows.md) | Exact DFlash2 speculation, with verification rows chosen on the GPU from the drafter only and row-invariant kernels. |
 | [0006](0006-weights-mlx-safetensors-no-gguf-flash-next-format-and-ssd-experts.md) | MLX safetensors only, never GGUF; Flash-Next in its own lossless format; experts can be read from the SSD. |
-| [0007](0007-lab-serve-openai-compatible-with-exact-prefix-cache.md) | `lab serve` speaks the OpenAI chat API and resumes from an exact prefix cache. |
+| [0007](0007-ingot-serve-openai-compatible-with-exact-prefix-cache.md) | `ingot serve` speaks the OpenAI chat API and resumes from an exact prefix cache. |

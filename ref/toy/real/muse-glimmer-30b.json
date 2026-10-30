@@ -1,5 +1,5 @@
 {
- "metal_lab_real": {
+ "ingot_real": {
   "source": "mlx-community/Muse-Glimmer-30B-4bit (revision 3e7677d7a40d348a3daba263a2b1c0aa41910710)",
   "note": "without quantization/quantization_config (affine 4 bits g64 everywhere, no overrides) and without vision_config (the vision tower is not loaded)"
  },
