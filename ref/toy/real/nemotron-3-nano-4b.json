@@ -1,5 +1,5 @@
 {
- "metal_lab_real": {
+ "ingot_real": {
   "source": "mlx-community/NVIDIA-Nemotron-3-Nano-4B-4bit (revision c4d79ba1901d…)",
   "note": "sin quantization ni quantization_config (afín 4 bits g64 en todo)"
  },

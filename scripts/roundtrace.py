@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Round breakdown from the JSONL of `lab-dev gen --round-trace N --round-trace-out f.jsonl` (P0, fn-instr).
+"""Round breakdown from the JSONL of `ingot-dev gen --round-trace N --round-trace-out f.jsonl` (P0, fn-instr).
 
 Each line is a round: encoders [label, layer, edge, t0, t1, value] in ms since gpuStartTime of the command buffer
 and marks of the ExpertStream thread [value, layer, sees the signal, answers] on the same scale. Usage:

@@ -1,7 +1,7 @@
 # Exactness regression with the toy models (loaded with `source` from scripts/ci.sh).
 
 # The KernelCase* suites (KernelCaseTests and KernelCaseFlashNextI8Tests, ~220 s and ~100 s: kernels of families
-# that are not on this Mac, the W8A8 of lab serve against its emulation and per-row invariance) only if the branch
+# that are not on this Mac, the W8A8 of ingot serve against its emulation and per-row invariance) only if the branch
 # touches kernels, layers or the tests relative to main (or with CI_KCASE=1; when in doubt, if there is no main, also):
 # it is the most expensive part of the filter and does not change unless the kernels are touched.
 kcase_needed() {
@@ -9,7 +9,7 @@ kcase_needed() {
     local base
     base=$(git merge-base HEAD "${CI_BASE:-main}" 2>/dev/null) || return 0
     { git diff --name-only "$base" HEAD; git diff --name-only HEAD; } \
-        | grep -qE '\.metal$|^Tests/MetalLabTests/|^Sources/MetalLab/(Layers/|Shaders/|Loader/|Flash|GPU\.swift)'
+        | grep -qE '\.metal$|^Tests/IngotTests/|^Sources/Ingot/(Layers/|Shaders/|Loader/|Flash|GPU\.swift)'
 }
 # ci_toys computes once into KCASE_RUN whether this run's swift test includes the KernelCase* suites.
 lane_test() {
@@ -41,29 +41,29 @@ toy() {
         [ -f "$golden" ] || fail "missing $golden (TOY_WRITE_GOLDEN=1 scripts/ci.sh --toy, only for deliberately changed tokens)"
     fi
     # shellcheck disable=SC2086  # $genx is a list of flags (or empty): it must split
-    run "toy-gen-$tag" "$LAB" gen --model "$model" --prompts 512,4K --n 128 --nostop --check --golden "$golden" \
+    run "toy-gen-$tag" "$DEV" gen --model "$model" --prompts 512,4K --n 128 --nostop --check --golden "$golden" \
         --golden-logits $gw --logits-store "$TOYDIR/logits" $genx "$@"
     if [ "$tag" = flash ]; then
         # shellcheck disable=SC2086  # $genx is a list of flags (or empty): it must split
-        run "toy-gen-$tag-kvgrow" "$LAB" gen --model "$model" --prompts 512,4K --n 128 --nostop --check \
+        run "toy-gen-$tag-kvgrow" "$DEV" gen --model "$model" --prompts 512,4K --n 128 --nostop --check \
             --golden "$golden" --golden-logits --golden-strict --logits-store "$TOYDIR/logits" --kv-pool 1 $genx "$@"
     fi
     [ "${TOY_GEN_ONLY:-0}" = 0 ] || return 0
-    run "toy-reuse-$tag" "$LAB" reuse --model "$model" --n "${TOY_REUSE_N:-32-128}" --cover "${TOY_COVER:-N,N+1}" "$@"
+    run "toy-reuse-$tag" "$DEV" reuse --model "$model" --n "${TOY_REUSE_N:-32-128}" --cover "${TOY_COVER:-N,N+1}" "$@"
     # Step 5 (returning to a conversation from a cut not aligned to 64) is informative: with the toy logits the greedy
     # diverges because of the rounding of the chunked GDN (see PrefixCheck.swift); the prefill split at aligned cuts is
-    # checked bit by bit by splitcheck. --int8 0 --qk8 0: prefixcache takes lab serve's defaults (lossy prefill on MoE);
+    # checked bit by bit by splitcheck. --int8 0 --qk8 0: prefixcache takes ingot serve's defaults (lossy prefill on MoE);
     # here the exact prefill, the int8 one is the line below.
-    run "toy-prefixcache-$tag" "$LAB" prefixcache --model "$model" --no-cold --n 64 --int8 0 --qk8 0 "$@"
-    run "toy-splitcheck-$tag" "$LAB" splitcheck --model "$model" "$@"
-    # With the lossy prefill of lab serve (W8A8 and Q·Kᵀ int8): each row goes in int8 according to its position, so
+    run "toy-prefixcache-$tag" "$DEV" prefixcache --model "$model" --no-cold --n 64 --int8 0 --qk8 0 "$@"
+    run "toy-splitcheck-$tag" "$DEV" splitcheck --model "$model" "$@"
+    # With the lossy prefill of ingot serve (W8A8 and Q·Kᵀ int8): each row goes in int8 according to its position, so
     # the state at a cut does not depend on how the prompt is split. With and without prefix cache, and with or
     # without int8, the whole prompt goes through the prefill (Prompt.swift).
-    run "toy-prefixcache-$tag-int8" "$LAB" prefixcache --model "$model" --no-cold --n 64 --int8 1 --qk8 1 "$@"
-    run "toy-splitcheck-$tag-int8" "$LAB" splitcheck --model "$model" --int8 1 --qk8 1 "$@"
+    run "toy-prefixcache-$tag-int8" "$DEV" prefixcache --model "$model" --no-cold --n 64 --int8 1 --qk8 1 "$@"
+    run "toy-splitcheck-$tag-int8" "$DEV" splitcheck --model "$model" --int8 1 --qk8 1 "$@"
 }
 # Negative control (like sglang's test_self_e2e_perturb_*): reuse, prefixcache and splitcheck with --perturb (hidden
-# lab-dev option: alters the restored recurrent state or the one between two prefill chunks; in rowscheck without a
+# ingot-dev option: alters the restored recurrent state or the one between two prefill chunks; in rowscheck without a
 # drafter, sends the rounds of k rows through the prefill) have to report FAILED. If they report OK, the test is not
 # checking what it claims and the CI fails. With the toy MoE (GDN) and the shortest form of each test (~20 s; with
 # LFM2.5's short convolution it also fails, checked by hand). CI_NEG_SELFTEST=1 launches them without perturbing: the CI
@@ -73,7 +73,7 @@ negative() {
     local log="$LOG_DIR/neg-$test-$tag.log" pert="--perturb" rc=0
     [ "${CI_NEG_SELFTEST:-0}" = 1 ] && pert=""
     step "neg-$test-$tag (negative control: has to report FAILED)"
-    "$LAB" "$test" --model "$TOYDIR/$name" $pert "$@" > "$log" 2>&1 || rc=$?
+    "$DEV" "$test" --model "$TOYDIR/$name" $pert "$@" > "$log" 2>&1 || rc=$?
     if [ "$rc" = 1 ] && grep -q "^$test: FAILED" "$log"; then
         echo "$(grep -c '\[negative control\]' "$log" || true) perturbations; $(grep "^$test: FAILED" "$log") (as it should)"
     elif [ "$rc" = 0 ]; then
@@ -120,7 +120,7 @@ lane_moe() {
     # 0.15 GB is 678 slots of 216 KiB, the first 256 for the prefill ring and 422 for ARC, for the 1024 experts of the
     # toy (4 layers x 256), so decode misses and evicts in every round (55-68 % hits) and the 4K prefill goes through
     # the ring. Its golden is the one without the cache: the same tokens and logits, bit for bit (~4 s alone).
-    run toy-gen-moe-expertcache "$LAB" gen --model "$TOYDIR/toy-qwen36-moe" --prompts 512,4K --n 128 --nostop --check \
+    run toy-gen-moe-expertcache "$DEV" gen --model "$TOYDIR/toy-qwen36-moe" --prompts 512,4K --n 128 --nostop --check \
         --golden ref/golden/toy-qwen36-moe.json --golden-logits --golden-strict --expert-cache-gb 0.15
     # LFM2.5 (lfm2_moe): short convolution, attention with 64-wide heads, MoE of 64 experts top-4 sigmoid; no drafter
     # (gen compares the normal decode with the chained one).
@@ -133,16 +133,16 @@ lane_moe() {
     TOY_COVER="N without extra round,N+1" toy granite toy-granite ""
     # Batched decoding (one round for N conversations, each in its own KV slot) gives each conversation the tokens and
     # logits it gives alone, bit for bit; N = 2 and 4 over the 512, 4K and chat prompts (~5 s), with G = 5.
-    run toy-batchcheck-granite "$LAB" batchcheck --model "$TOYDIR/toy-granite" --rows 2,4 --n 24
-    # The only step through lab serve's ChatServer and Session (batched path): with the agent guards on, a toy looping
+    run toy-batchcheck-granite "$DEV" batchcheck --model "$TOYDIR/toy-granite" --rows 2,4 --n 24
+    # The only step through ingot serve's ChatServer and Session (batched path): with the agent guards on, a toy looping
     # on purpose is cut with finish_reason "length" and ids that are a prefix of the uncut ones (~4.6 s, 3.7 of them
-    # starting lab serve).
-    run toy-serve-guard python3 scripts/ci/serve_guard.py .build/release/lab "$TOYDIR/toy-granite" \
+    # starting ingot serve).
+    run toy-serve-guard python3 scripts/ci/serve_guard.py .build/release/ingot "$TOYDIR/toy-granite" \
         "$LOG_DIR/toy-serve-guard-server.log"
     # The same with GDN layers (toy-qwen38-dense, GDN and attention): each conversation's recurrent state, conv history
     # and tape in its slot; with --seed, sampled, each conversation with its own seed, temperature, top-k/top-p/min-p
-    # and penalties, the same ids as alone by the lab serve path (decodePlain).
-    run toy-batchcheck-qwen38-dense "$LAB" batchcheck --model "$TOYDIR/toy-qwen38-dense" --rows 2,4 --n 24 --seed 1
+    # and penalties, the same ids as alone by the ingot serve path (decodePlain).
+    run toy-batchcheck-qwen38-dense "$DEV" batchcheck --model "$TOYDIR/toy-qwen38-dense" --rows 2,4 --n 24 --seed 1
     # (batchcheck --serve on the MoE is in the dense lane: toy_batch_serve_moe.)
     negative moe toy-qwen36-moe reuse --n 48
     negative moe toy-qwen36-moe prefixcache --n 16 --no-cold --int8 0 --qk8 0
@@ -156,12 +156,12 @@ lane_dense() {
     toy_batch_serve_moe
     toy_lfm3_prefixcache
 }
-# lab serve's engine loop (InferenceEngine.serve) with slots served one at a time on the MoE with its toy drafter: 2 and
+# ingot serve's engine loop (InferenceEngine.serve) with slots served one at a time on the MoE with its toy drafter: 2 and
 # 4 conversations of two turns queued at once (and 4 with 2 slots), greedy and sampled, each turn the same ids and
 # rounds as alone and every turn 2 from its slot's live state (drafter ring per slot). The same on toy-muse, with each
 # slot's drafter ring over a ring KV, is in toy_muse_ring.
 toy_batch_serve_moe() {
-    run toy-batchcheck-serve-moe "$LAB" batchcheck --serve --model "$TOYDIR/toy-qwen36-moe" --rows 2,4 --n 24 --seed 1 \
+    run toy-batchcheck-serve-moe "$DEV" batchcheck --serve --model "$TOYDIR/toy-qwen36-moe" --rows 2,4 --n 24 --seed 1 \
         --copy off
 }
 # toy-gemma4: gemma4_text from gemma-4-26B-A4B-it's config with every piece of the family: sliding (head 256, 8 kv, W
@@ -177,7 +177,7 @@ toy_batch_serve_moe() {
 # (attention only: no 64 alignment needed).
 toy_gemma4() {
     TOY_COVER="N without extra round,N+1" toy gemma4 toy-gemma4 ""
-    run toy-splitcheck-gemma4-ring "$LAB" splitcheck --model "$TOYDIR/toy-gemma4" --cuts 299,300,301,2368,2496
+    run toy-splitcheck-gemma4-ring "$DEV" splitcheck --model "$TOYDIR/toy-gemma4" --cuts 299,300,301,2368,2496
 }
 # toy-muse: muse_glimmer from Muse Glimmer 30B's config, one period of the real layers (three sliding with RoPE θ 5e5 on
 # the whole head and the real window of 2048, one global with NoPE), GQA 32/2 with 128-wide heads, the separate
@@ -188,15 +188,15 @@ toy_gemma4() {
 # entries at W − 1, W, W + 1 (its step 7; ring ± 64 does not fit the 4K prompt) and checks the drafter ring of each
 # entry (step 6), and its conversations (up to ~4.6K tokens) wrap the ring. The six steps (test lane); toy_muse_ring
 # (dense lane, to even out the lanes) adds splitcheck at the window cuts (2112, the ring's first chunk past W, is a
-# default cut) and batchcheck --serve: lab serve's slots served one at a time with each slot's drafter ring over a ring
+# default cut) and batchcheck --serve: ingot serve's slots served one at a time with each slot's drafter ring over a ring
 # KV, which toy-qwen36-moe's (full attention only) does not reach. Its rowscheck (drafter form) goes with the others in
 # toy_rows.
 toy_muse() {
     toy muse toy-muse ""
 }
 toy_muse_ring() {
-    run toy-splitcheck-muse-ring "$LAB" splitcheck --model "$TOYDIR/toy-muse" --cuts 2047,2048,2049
-    run toy-batchcheck-serve-muse "$LAB" batchcheck --serve --model "$TOYDIR/toy-muse" --rows 2,4 --n 24 --seed 1 \
+    run toy-splitcheck-muse-ring "$DEV" splitcheck --model "$TOYDIR/toy-muse" --cuts 2047,2048,2049
+    run toy-batchcheck-serve-muse "$DEV" batchcheck --serve --model "$TOYDIR/toy-muse" --rows 2,4 --n 24 --seed 1 \
         --copy off
 }
 # toy-gptoss: gpt_oss from gpt-oss-20b's config, with only the cuts: sliding (W 128) and full layers, learned sinks (the
@@ -214,9 +214,9 @@ toy_muse_ring() {
 # needed) and at the drafter ring's 2047, 2048 and 2049.
 toy_gptoss() {
     TOY_COVER=N+1 toy gptoss toy-gptoss ""
-    run toy-gen-gptoss-nodrafter "$LAB" gen --model "$TOYDIR/toy-gptoss" --prompts 512,4K --n 128 --nostop --check \
+    run toy-gen-gptoss-nodrafter "$DEV" gen --model "$TOYDIR/toy-gptoss" --prompts 512,4K --n 128 --nostop --check \
         --golden ref/golden/toy-gptoss.json --golden-strict --drafter none
-    run toy-splitcheck-gptoss-ring "$LAB" splitcheck --model "$TOYDIR/toy-gptoss" \
+    run toy-splitcheck-gptoss-ring "$DEV" splitcheck --model "$TOYDIR/toy-gptoss" \
         --cuts 127,128,129,2047,2048,2049,2240,2368
 }
 # LFM2.5-8B-A1B has no toy (one per family: toy-lfm2): it is the real model "lfm" of scripts/ci/real.sh.
@@ -224,7 +224,7 @@ toy_gptoss() {
 # its golden at the 512 prompt (the shape goes through MetalContext: if one overwrote another, they would change).
 toy_shapes() {
     [ "${TOY_WRITE_GOLDEN:-0}" != 1 ] || return 0
-    run toy-shapes "$LAB" shapes --dir "$TOYDIR" --prompts 512
+    run toy-shapes "$DEV" shapes --dir "$TOYDIR" --prompts 512
 }
 # Flash-Next: in gen, an expert cache of 0.3 GB (565 slots for 2048 experts of 272 KiB: misses in every round); in the
 # rest, the default one (all fit after reading them once: faster). The PLE one, 1 MB in all.
@@ -242,22 +242,22 @@ lane_flash() {
 # full layers (the proportional table) and θ 1e4 in the sliding one (window 256, ring 2432: the 512 and 4K prompts go
 # past the window and the 4K one wraps the ring), dense w1/w3/w2 SwiGLU, every matrix 8-bit g64 like the real MLX-8bit,
 # tied embedding. No drafter, so gen compares the normal decode with the chained one and reuse only reaches N+1. Four
-# steps, no -int8 ones (dense: lab serve runs the exact prefill), spread over three lanes so that flash is not the
+# steps, no -int8 ones (dense: ingot serve runs the exact prefill), spread over three lanes so that flash is not the
 # longest: gen and splitcheck here, splitcheck with the default cuts and the window and ring ones in a single
 # run (192, 256, 320, 2368, 2432, 2496, aligned to 64 for the conv snapshots); reuse in the moe lane and prefixcache in
 # the dense one. Its rowscheck (toy_rows) and fidelity (ci_fidelity) are in the fid lane.
 toy_lfm3() {
     TOY_GEN_ONLY=1 toy lfm3 toy-lfm3 ""
-    run toy-splitcheck-lfm3 "$LAB" splitcheck --model "$TOYDIR/toy-lfm3" \
+    run toy-splitcheck-lfm3 "$DEV" splitcheck --model "$TOYDIR/toy-lfm3" \
         --cuts 64,192,256,320,1024,2112,2368,2432,2496,3008
 }
 toy_lfm3_reuse() {
-    run toy-reuse-lfm3 "$LAB" reuse --model "$TOYDIR/toy-lfm3" --n 32-128 --cover N+1
+    run toy-reuse-lfm3 "$DEV" reuse --model "$TOYDIR/toy-lfm3" --n 32-128 --cover N+1
 }
 # prefixcache with --n 32 (64 in the other toys): the restored state is already compared bit by bit in its step 2 and
 # the last prompt position's logits in step 4, and the 4K prompt crosses the window and wraps the ring before that.
 toy_lfm3_prefixcache() {
-    run toy-prefixcache-lfm3 "$LAB" prefixcache --model "$TOYDIR/toy-lfm3" --no-cold --n 32 --int8 0 --qk8 0
+    run toy-prefixcache-lfm3 "$DEV" prefixcache --model "$TOYDIR/toy-lfm3" --no-cold --n 32 --int8 0 --qk8 0
 }
 # toy-nemotron: nemotron_h from Nemotron 3.5 Lightning's config, with Mamba2 layers (64 heads × 64, groups of the GDN
 # kernels), attention without RoPE (head 128, 32/2), and the MoE with relu² without gate, 128 experts top-6, a sigmoid
@@ -292,9 +292,9 @@ toy_glm() {
 toy_rows() {
     local t
     for t in lfm2 lfm3 granite gptoss nemotron glm; do
-        run "toy-rowscheck-$t" "$LAB" rowscheck --model "$TOYDIR/toy-$t" --prompts 512
+        run "toy-rowscheck-$t" "$DEV" rowscheck --model "$TOYDIR/toy-$t" --prompts 512
     done
-    run toy-rowscheck-muse "$LAB" rowscheck --model "$TOYDIR/toy-muse" --prompts 512
+    run toy-rowscheck-muse "$DEV" rowscheck --model "$TOYDIR/toy-muse" --prompts 512
     negative granite toy-granite rowscheck --prompts 512
 }
 # The same drafter-less rowscheck, with --drafter none, for the families whose other models run without a drafter:
@@ -303,10 +303,10 @@ toy_rows() {
 # drafter is discarded, and the 27B or the MoE served without one: the copy rounds of decodeSpec). ~3-7 s each alone (gemma4's window of
 # 300 < 512 takes it over the ring). In the flash lane, to keep the fid lane from being the longest.
 toy_rows_nodrafter() {
-    run toy-rowscheck-gptoss-nodrafter "$LAB" rowscheck --model "$TOYDIR/toy-gptoss" --prompts 512 --drafter none
-    run toy-rowscheck-gemma4 "$LAB" rowscheck --model "$TOYDIR/toy-gemma4" --prompts 512 --drafter none
-    run toy-rowscheck-qwen38-dense "$LAB" rowscheck --model "$TOYDIR/toy-qwen38-dense" --prompts 512 --drafter none
-    run toy-rowscheck-qwen36-moe "$LAB" rowscheck --model "$TOYDIR/toy-qwen36-moe" --prompts 512 --drafter none
+    run toy-rowscheck-gptoss-nodrafter "$DEV" rowscheck --model "$TOYDIR/toy-gptoss" --prompts 512 --drafter none
+    run toy-rowscheck-gemma4 "$DEV" rowscheck --model "$TOYDIR/toy-gemma4" --prompts 512 --drafter none
+    run toy-rowscheck-qwen38-dense "$DEV" rowscheck --model "$TOYDIR/toy-qwen38-dense" --prompts 512 --drafter none
+    run toy-rowscheck-qwen36-moe "$DEV" rowscheck --model "$TOYDIR/toy-qwen36-moe" --prompts 512 --drafter none
 }
 lane_fid() {
     toy_glm

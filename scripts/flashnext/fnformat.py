@@ -1,4 +1,4 @@
-"""Lab format for Qwen3.8-Flash-Next (qwen4_exp_text) and a minimal GGUF reader.
+"""ingot format for Qwen3.8-Flash-Next (qwen4_exp_text) and a minimal GGUF reader.
 
 The engine never reads GGUF: this module is only used by the converter (once) to extract the ISTA Q2_0 GSQ experts.
 

@@ -5,7 +5,7 @@ index_store_path: .build/periphery/out/Products/Debug/index/store
 relative_results: true
 # Top-level code in main.swift does not count as a root with this index: without this, every cmd* shows as unused.
 retain_files:
-  - Sources/lab/main.swift
-  - Sources/lab-dev/main.swift
+  - Sources/IngotTool/main.swift
+  - Sources/ingot-dev/main.swift
 # Parameter structs passed to Metal with setBytes are written and never read from Swift.
 retain_assign_only_properties: true

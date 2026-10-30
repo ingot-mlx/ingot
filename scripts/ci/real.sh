@@ -65,19 +65,19 @@ exactness() {
     [ -d "ref/out/$pdir" ] || fail "missing ref/out/$pdir (prompts of $tag)"
     local golden
     golden="ref/golden/$(basename "$model").json"
-    case "$what" in *" gen "*) run "gen-check-$tag" "$LAB" gen --model "$model" --prompts 512,4K --n "$n" --check \
+    case "$what" in *" gen "*) run "gen-check-$tag" "$DEV" gen --model "$model" --prompts 512,4K --n "$n" --check \
         --pdir "$pdir" --golden "$golden" --golden-strict ;; esac
-    # The KV that grows on demand (the one of lab serve; KVPool).
-    case "$what" in *" kvgrow "*) run "gen-check-$tag-kvgrow" "$LAB" gen --model "$model" --prompts 512,4K --n "$n" \
+    # The KV that grows on demand (the one of ingot serve; KVPool).
+    case "$what" in *" kvgrow "*) run "gen-check-$tag-kvgrow" "$DEV" gen --model "$model" --prompts 512,4K --n "$n" \
         --check --pdir "$pdir" --golden "$golden" --golden-strict --kv-pool 1 ;; esac
-    case "$what" in *" reuse "*) run "reuse-$tag" "$LAB" reuse --model "$model" ;; esac
+    case "$what" in *" reuse "*) run "reuse-$tag" "$DEV" reuse --model "$model" ;; esac
     # Step 5 of prefixcache (returning to a conversation) is strict against the reference split at the same cut.
-    # With the no-cache turns of step 1 (they only give timings; without them with --validate). With lab serve's
+    # With the no-cache turns of step 1 (they only give timings; without them with --validate). With ingot serve's
     # defaults, what pi runs: the lossy prefill (W8A8 and Q·Kᵀ int8) on the MoE models, with the family's
     # int8 experts (Flash-Next's Q2 ones; the rest exact); the exact prefill on the dense ones. The exact prefill of
     # the MoE models is covered by the toys.
     # shellcheck disable=SC2086
-    case "$what" in *" prefix "*) run "prefixcache-$tag" "$LAB" prefixcache --model "$model" $nocold ;; esac
+    case "$what" in *" prefix "*) run "prefixcache-$tag" "$DEV" prefixcache --model "$model" $nocold ;; esac
 }
 # ci_real TAG...: every step of each tag, in the order given.
 ci_real() {
@@ -89,7 +89,7 @@ ci_real() {
             "$(real_field "$tag" 4 | tr , ' ')" "$var"
         # The Heretic also checks the choice of rows of the round (only there: the copy with a drafter on a MoE).
         if [ "$tag" = moe ]; then
-            run rowscheck "$LAB" rowscheck --model "${!var}" --pdir prompts-es --prompts es-chat --reps 2
+            run rowscheck "$DEV" rowscheck --model "${!var}" --pdir prompts-es --prompts es-chat --reps 2
         fi
     done
 }
@@ -98,7 +98,7 @@ ci_real_validate() {
     local tag var
     for tag in "$@"; do
         var=$(real_model_var "$tag")
-        run "sv-gen-check-$tag" "$LAB" gen --model "${!var}" --prompts 512 --n 16 --check \
+        run "sv-gen-check-$tag" "$DEV" gen --model "${!var}" --prompts 512 --n 16 --check \
             --pdir "$(real_field "$tag" 3)"
     done
 }

@@ -5,7 +5,7 @@
                                              then gpt-oss's swiglu_oai(gate, up) on a grid and Nemotron-H's
                                              nn.relu2(x)
 
-The values are copied into Tests/MetalLabTests/KernelCaseActivations.swift (GeluReferenceTests, Relu2ReferenceTests) and
+The values are copied into Tests/IngotTests/KernelCaseActivations.swift (GeluReferenceTests, Relu2ReferenceTests) and
 KernelCaseGptOss.swift (SwigluOAIReferenceTests);
 the test checks that the
 CPU formula of the kernel cases matches them, so the kernels are compared against what mlx-lm computes.

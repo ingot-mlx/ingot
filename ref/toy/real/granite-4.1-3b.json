@@ -14,7 +14,7 @@
  "intermediate_size": 8192,
  "logits_scaling": 10.0,
  "max_position_embeddings": 131072,
- "metal_lab_real": {
+ "ingot_real": {
   "note": "config.json as is (4-bit affine g32 for every matrix, embedding included)",
   "source": "~/Models/granite-4.1-3b-4bit (mlx-community/granite-4.1-3b-4bit @ b1b476b5, mlx-lm 0.31.3)"
  },

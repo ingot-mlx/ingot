@@ -1,6 +1,6 @@
 """MLX reference of one layer's MoE block of Qwen3.6-35B-A3B (qwen3_5_moe) with real weights.
 
-Realistic input: real text (the markdown files of --text-dir plus the lab's sources) tokenized and run through layers
+Realistic input: real text (the markdown files of --text-dir plus ingot's sources) tokenized and run through layers
 0..L-1 of the model with mlx-lm; the MoE input of layer L is post_attention_layernorm(h + attn(h)).
 
 Writes to <out>/:
@@ -39,10 +39,10 @@ def resolve(model):
 
 
 def corpus(text_dir):
-    """Real, stable text: the markdown files of text_dir and the lab's sources, in a fixed order."""
+    """Real, stable text: the markdown files of text_dir and ingot's sources, in a fixed order."""
     files = sorted(glob.glob(os.path.join(os.path.expanduser(text_dir), "*.md")))
     files += sorted(glob.glob(os.path.join(HERE, "..", "Sources", "**", "*.swift"), recursive=True))
-    files += sorted(glob.glob(os.path.join(HERE, "..", "Sources", "MetalLab", "Shaders", "*.metal")))
+    files += sorted(glob.glob(os.path.join(HERE, "..", "Sources", "Ingot", "Shaders", "*.metal")))
     return "\n\n".join(open(f, encoding="utf-8").read() for f in files)
 
 

@@ -1,5 +1,5 @@
 {
- "metal_lab_real": {
+ "ingot_real": {
   "source": "mlx-community/GLM-4.7-Flash-4bit (revision 1454cffb1a21737e162f508e5bc70be9def89276)",
   "note": "without quantization (affine 4 bits g64 everywhere, no overrides; the router stays bf16, unquantized)"
  },

@@ -1,6 +1,6 @@
 """Tokenizer and chat template references for the model families, without MLX and without weights:
 Hugging Face tokenizers ids and decode for each repo's tokenizer.json, and transformers' apply_chat_template, read from
-the Hugging Face cache. Writes Tests/LabServeTests/Resources/<repo name>/{tok,chat,special,model}.json.
+the Hugging Face cache. Writes Tests/IngotServeTests/Resources/<repo name>/{tok,chat,special,model}.json.
 
 chat.json and special.json are those of serve_ref.py (same conversations, special.json with the template-only ids),
 adapted to each template: gpt-oss reads the reasoning from `thinking` instead of `reasoning_content`, Muse gets a
@@ -203,7 +203,7 @@ def main():
     serve_ref = import_serve_ref()
     all_texts = texts(serve_ref)
     for repo in a.repo or REPOS:
-        out = os.path.join(HERE, "..", "Tests", "LabServeTests", "Resources", repo.rstrip("/").split("/")[-1])
+        out = os.path.join(HERE, "..", "Tests", "IngotServeTests", "Resources", repo.rstrip("/").split("/")[-1])
         os.makedirs(out, exist_ok=True)
         toks = tok_cases(repo, all_texts + REPO_TEXTS.get(repo, []))
         with open(os.path.join(out, "tok.json"), "w") as f:

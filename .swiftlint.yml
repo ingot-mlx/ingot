@@ -1,4 +1,4 @@
-# SwiftLint for the laboratory.
+# SwiftLint for ingot.
 # Criterion: warn about what is usually a real bug or smell, not about the dense style of kernel code
 # (single-letter names such as M, N, K, B, P follow matrix notation). Formatting is decided by .swift-format.
 # 0 warnings: scripts/ci.sh runs `swiftlint lint --strict` and fails on any. Exceptions go

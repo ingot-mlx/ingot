@@ -62,7 +62,7 @@ import fnformat as F  # noqa: E402
 
 MD = os.path.expanduser(args.model)
 CFG = json.load(open(os.path.join(MD, 'config.json')))
-LAB = CFG['metal_lab']
+FMT = CFG['ingot']
 tc = dict(CFG['text_config'])
 tcfg = TextConfig.from_dict(tc)
 NL = args.layers or tcfg.num_hidden_layers
@@ -112,8 +112,8 @@ def module_weights(prefix):
 
 
 # ------------------------------------------------------------------ experts (experts.bin) and PLE (ple.bin)
-EXP = np.memmap(os.path.join(MD, LAB['experts']['file']), dtype=np.uint8, mode='r')
-PLE = np.memmap(os.path.join(MD, LAB['ple']['file']), dtype=np.uint8, mode='r')
+EXP = np.memmap(os.path.join(MD, FMT['experts']['file']), dtype=np.uint8, mode='r')
+PLE = np.memmap(os.path.join(MD, FMT['ple']['file']), dtype=np.uint8, mode='r')
 
 
 def expert_f32(layer, e):
@@ -200,7 +200,7 @@ def build_layer(i):
     layer.mlp.switch_mlp = LazyExperts(i)
     if 'ple' in layer:
         layer.ple.ple_embedding.ngram_embedding = PLEReader()
-        m = LAB['ple']
+        m = FMT['ple']
         emb = layer.ple.ple_embedding
         assert emb.layer_multipliers.tolist() == m['multipliers'], (emb.layer_multipliers.tolist(), m['multipliers'])
         assert emb.ngram_heads_offsets.tolist() == m['head_offsets']

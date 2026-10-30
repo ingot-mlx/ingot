@@ -1,4 +1,4 @@
-"""First token of the second pi turn with lab serve running (prefix cache).
+"""First token of the second pi turn with ingot serve running (prefix cache).
 
 Turn 1: the body of a real pi request (system prompt and 8 tools) with one user message, at
 temperature 0. Turn 2: the same conversation with the reply as is and a new message of ~L tokens: a tool result

@@ -1,7 +1,7 @@
 """Tool-call parser references for the dialects, without MLX and without weights.
 
 For each repo whose template writes a parsed tool format (GLM-4.7 XML, Hermes JSON, Gemma 4, Muse ATEM, LFM3's
-Qwen3-Coder XML) it writes Tests/LabServeTests/Resources/<repo name>/tools.json with:
+Qwen3-Coder XML) it writes Tests/IngotServeTests/Resources/<repo name>/tools.json with:
 
 - "spans": round trip with the template. Each assistant turn of the serve_ref.py conversations (and one with awkward
   values) is rendered after its prefix; the text after the prefix's generation prompt, up to the first end token, is
@@ -11,7 +11,7 @@ Qwen3-Coder XML) it writes Tests/LabServeTests/Resources/<repo name>/tools.json 
   is declared, text before and after) with what mlx-lm's parser reads.
 
 gpt-oss (harmony) has no parser in mlx-lm 0.32.2 (its server returns the raw channels): only the round trip, with
-"mlx" null; its hand-written cases are in Tests/LabServeTests/HarmonyTests.swift. Its template writes one call per
+"mlx" null; its hand-written cases are in Tests/IngotServeTests/HarmonyTests.swift. Its template writes one call per
 assistant turn (the first), so a turn with two only expects the first.
 
 mlx-lm's parsers (0.32.2, from ref/.venv) are loaded by file path with importlib so that mlx_lm/__init__.py (which
@@ -269,7 +269,7 @@ def main():
         tok = AutoTokenizer.from_pretrained(path)
         sp, skipped = spans(repo, fmt, mod, tok, serve_ref)
         hard = [{"name": n, "text": t, "mlx": mlx_calls(t, fmt, mod, serve_ref.TOOLS)} for n, t in HARD.get(fmt, [])]
-        out = os.path.join(HERE, "..", "Tests", "LabServeTests", "Resources", repo.split("/")[-1])
+        out = os.path.join(HERE, "..", "Tests", "IngotServeTests", "Resources", repo.split("/")[-1])
         os.makedirs(out, exist_ok=True)
         with open(os.path.join(out, "tools.json"), "w") as f:
             json.dump({"format": fmt, "tools": serve_ref.TOOLS, "spans": sp, "hard": hard}, f, ensure_ascii=False,

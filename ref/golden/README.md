@@ -1,12 +1,12 @@
 # ref/golden
 
-Reference outputs that `lab-dev gen --golden <file>` compares against (generated tokens and, with `--golden-logits`,
+Reference outputs that `ingot-dev gen --golden <file>` compares against (generated tokens and, with `--golden-logits`,
 logit fingerprints). One JSON file per model, named after the model directory.
 
 ## Toy models (`toy-*.json`)
 
-Not tied to local checkpoints. `lab-dev toymodels` generates the toy weights deterministically (under
-`~/.cache/metal-lab/toy`) and writes their prompts to `ref/out/prompts-toy`; `scripts/ci.sh --toy` runs it when needed.
+Not tied to local checkpoints. `ingot-dev toymodels` generates the toy weights deterministically (under
+`~/.cache/ingot/toy`) and writes their prompts to `ref/out/prompts-toy`; `scripts/ci.sh --toy` runs it when needed.
 They store the 128 tokens of `--prompts 512,4K --n 128` and their logit fingerprints; with another `--n` they do not
 apply. The fingerprints are bit-exact, so another GPU or OS version may still differ. The toys with a drafter
 (`drafter/`: DFlash2, or toy-gemma4's DFlash v1) store one fingerprint per prompt and mode, normal and speculative;
@@ -41,7 +41,7 @@ written without a drafter (the greedy does not depend on it); the weights, with 
 mlx-lm reference through `ref/lfm3_ref.py` (mlx-lm PR #2016's `lfm3.py`); the CI's LFM3; the weights are kept outside the repo))
 and from tokenized prompts in `ref/out/prompts*` (written by `ref/prompts.py`, not tracked in
 git). Elsewhere they only match with the same weights, the same prompt files and the same hardware; otherwise write
-your own with `lab-dev gen ... --golden ref/golden/<model>.json --write-golden`.
+your own with `ingot-dev gen ... --golden ref/golden/<model>.json --write-golden`.
 
 `scripts/ci.sh --real TAG,...` reads the model paths from the variables of the `REAL_MODELS` table in
 `scripts/ci/real.sh` (one real model per tier-1 family: `CI_MODEL_MOE`, `CI_MODEL_DENSE`, `CI_MODEL_FLASH`,

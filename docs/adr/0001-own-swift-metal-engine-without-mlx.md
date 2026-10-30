@@ -13,9 +13,9 @@ transformers) are Python.
 
 ## Decision
 
-- The engine is a Swift package: the `MetalLab` library (loader, layers, kernels, drafter, generation, memory plan),
-  `LabServe` (the server), and two executables, `lab` (use) and `lab-dev` (exactness checks and benches).
-- Every op is a hand-written Metal kernel in `Sources/MetalLab/Shaders`. At runtime the only dependencies are Apple's
+- The engine is a Swift package: the `Ingot` library (loader, layers, kernels, drafter, generation, memory plan),
+  `IngotServe` (the server), and two executables, `ingot` (use) and `ingot-dev` (exactness checks and benches).
+- Every op is a hand-written Metal kernel in `Sources/Ingot/Shaders`. At runtime the only dependencies are Apple's
   frameworks and `swift-jinja` (chat templates). No MLX, no Python.
 - Weights are the community's MLX safetensors, mapped from disk (ADR 6). The tokenizer and the chat template run in
   Swift.

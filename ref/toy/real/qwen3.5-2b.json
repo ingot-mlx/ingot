@@ -3,7 +3,7 @@
   "Qwen3_5ForConditionalGeneration"
  ],
  "image_token_id": 248056,
- "metal_lab_real": {
+ "ingot_real": {
   "note": "sin vision_config",
   "source": "mlx-community/Qwen3.5-2B-4bit (revision 674aaa7240b9…)"
  },

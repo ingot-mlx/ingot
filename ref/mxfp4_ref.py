@@ -6,7 +6,7 @@
 
 Two rows of 64 inputs (two groups of 32 each): the codes run through all 16 e2m1 patterns (both signs, -0 included) in
 a fixed scramble, and the four scales span the range of gpt-oss-20b's experts (2^-11 ... 2^8). The values are copied
-into Tests/MetalLabTests/KernelCaseMXFP4.swift (MXFP4ReferenceTests); the test checks that the CPU dequantization
+into Tests/IngotTests/KernelCaseMXFP4.swift (MXFP4ReferenceTests); the test checks that the CPU dequantization
 (SafetensorsStore.dequantizeRows, fp4E2M1ToFloat, e8m0ToFloat) gives them, so the kernels are compared against what mlx
 computes. It also checks here that mx.quantize(mode="mxfp4") of those values packs them back to the same words (value j
 in bits 4j of each uint32, like the affine 4 bits).

@@ -55,7 +55,7 @@
   "conv"
  ],
  "max_position_embeddings": 131072,
- "metal_lab_real": {
+ "ingot_real": {
   "note": "sin vision_config; quantization con las capas plegadas en layers.*",
   "source": "LFM2.5-24B-A2B-MLX-4bit-calib (copia local; conversor MLX calibrado propio)"
  },

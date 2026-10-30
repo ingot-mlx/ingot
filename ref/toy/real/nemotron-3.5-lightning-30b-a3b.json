@@ -1,5 +1,5 @@
 {
- "metal_lab_real": {
+ "ingot_real": {
   "source": "mlx-community/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-4bit (revision 55ac8c892611…)",
   "note": "sin quantization ni quantization_config (afín 4 bits g64 en todo salvo el router, bf16 sin cuantizar)"
  },

@@ -40,7 +40,7 @@
       "fixedBytes" : "670000000",
       "measured" : "true",
       "perChunkRowBytes" : "332000",
-      "source" : "measured (lab serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
+      "source" : "measured (ingot serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
     },
     "calibrationName" : "gemma4",
     "defaultDrafter" : null,
@@ -751,7 +751,7 @@
       "fixedBytes" : "670000000",
       "measured" : "true",
       "perChunkRowBytes" : "332000",
-      "source" : "measured (lab serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
+      "source" : "measured (ingot serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
     },
     "calibrationName" : "gemma4",
     "defaultDrafter" : "z-lab\/gemma-4-26B-A4B-it-DFlash",
@@ -1284,7 +1284,7 @@
       "fixedBytes" : "670000000",
       "measured" : "true",
       "perChunkRowBytes" : "332000",
-      "source" : "measured (lab serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
+      "source" : "measured (ingot serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
     },
     "calibrationName" : "gemma4",
     "defaultDrafter" : null,
@@ -2123,7 +2123,7 @@
       "fixedBytes" : "670000000",
       "measured" : "true",
       "perChunkRowBytes" : "332000",
-      "source" : "measured (lab serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
+      "source" : "measured (ingot serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
     },
     "calibrationName" : "gemma4",
     "defaultDrafter" : null,
@@ -2707,7 +2707,7 @@
       "fixedBytes" : "670000000",
       "measured" : "true",
       "perChunkRowBytes" : "332000",
-      "source" : "measured (lab serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
+      "source" : "measured (ingot serve, 26B-A4B and 31B, chunks of 2048\/1024; the 31B's)"
     },
     "calibrationName" : "gemma4",
     "defaultDrafter" : null,
@@ -3348,7 +3348,7 @@
       "fixedBytes" : "703000000",
       "measured" : "true",
       "perChunkRowBytes" : "236000",
-      "source" : "measured (lab serve, chunks of 2048\/1024)"
+      "source" : "measured (ingot serve, chunks of 2048\/1024)"
     },
     "calibrationName" : "glm4_moe_lite",
     "defaultDrafter" : null,
@@ -3945,7 +3945,7 @@
       "fixedBytes" : "180000000",
       "measured" : "true",
       "perChunkRowBytes" : "180000",
-      "source" : "measured (lab serve, chunks of 2048\/1024)"
+      "source" : "measured (ingot serve, chunks of 2048\/1024)"
     },
     "calibrationName" : "gpt_oss",
     "defaultDrafter" : "z-lab\/gpt-oss-20b-DFlash",
@@ -5438,7 +5438,7 @@
       "fixedBytes" : "150000000",
       "measured" : "true",
       "perChunkRowBytes" : "127000",
-      "source" : "measured (lab serve, LFM3-1.7B-MLX-8bit, chunks of 2048\/1024)"
+      "source" : "measured (ingot serve, LFM3-1.7B-MLX-8bit, chunks of 2048\/1024)"
     },
     "calibrationName" : "lfm3",
     "defaultDrafter" : null,
@@ -5809,7 +5809,7 @@
       "fixedBytes" : "1860000000",
       "measured" : "true",
       "perChunkRowBytes" : "235000",
-      "source" : "measured (lab serve, chunks of 2048\/1024, with drafter)"
+      "source" : "measured (ingot serve, chunks of 2048\/1024, with drafter)"
     },
     "calibrationName" : "muse_glimmer",
     "defaultDrafter" : "incoai\/Muse-Glimmer-30B-DFlash2",
@@ -6418,7 +6418,7 @@
       "fixedBytes" : "285000000",
       "measured" : "true",
       "perChunkRowBytes" : "235000",
-      "source" : "measured (lab serve, Lightning 30B-A3B, chunks of 2048\/1024)"
+      "source" : "measured (ingot serve, Lightning 30B-A3B, chunks of 2048\/1024)"
     },
     "calibrationName" : "nemotron_h",
     "defaultDrafter" : null,
@@ -6747,7 +6747,7 @@
       "fixedBytes" : "285000000",
       "measured" : "true",
       "perChunkRowBytes" : "235000",
-      "source" : "measured (lab serve, Lightning 30B-A3B, chunks of 2048\/1024)"
+      "source" : "measured (ingot serve, Lightning 30B-A3B, chunks of 2048\/1024)"
     },
     "calibrationName" : "nemotron_h",
     "defaultDrafter" : null,
@@ -7140,7 +7140,7 @@
       "fixedBytes" : "790000000",
       "measured" : "true",
       "perChunkRowBytes" : "470000",
-      "source" : "measured (lab serve, chunks of 2048\/1024)"
+      "source" : "measured (ingot serve, chunks of 2048\/1024)"
     },
     "calibrationName" : "qwen3_5",
     "defaultDrafter" : "incoai\/Qwen3.6-35B-A3B-DFlash2",
@@ -7407,7 +7407,7 @@
       "fixedBytes" : "790000000",
       "measured" : "true",
       "perChunkRowBytes" : "470000",
-      "source" : "measured (lab serve, chunks of 2048\/1024)"
+      "source" : "measured (ingot serve, chunks of 2048\/1024)"
     },
     "calibrationName" : "qwen3_5",
     "defaultDrafter" : "incoai\/Qwen3.6-35B-A3B-DFlash2",
@@ -7674,7 +7674,7 @@
       "fixedBytes" : "380000000",
       "measured" : "true",
       "perChunkRowBytes" : "300000",
-      "source" : "measured (lab serve, chunks of 2048\/1024\/512)"
+      "source" : "measured (ingot serve, chunks of 2048\/1024\/512)"
     },
     "calibrationName" : "qwen3_5_moe",
     "defaultDrafter" : "incoai\/Qwen3.6-35B-A3B-DFlash2",
@@ -8039,7 +8039,7 @@
       "fixedBytes" : "790000000",
       "measured" : "true",
       "perChunkRowBytes" : "470000",
-      "source" : "measured (lab serve, chunks of 2048\/1024)"
+      "source" : "measured (ingot serve, chunks of 2048\/1024)"
     },
     "calibrationName" : "qwen3_5",
     "defaultDrafter" : "incoai\/Qwen3.6-35B-A3B-DFlash2",
@@ -8520,7 +8520,7 @@
     },
     "calibrationName" : "qwen4_exp",
     "defaultDrafter" : "incoai\/Qwen3.8-Flash-Next-DFlash2",
-    "expertLayout" : "metalLabRecords",
+    "expertLayout" : "ingotRecords",
     "family" : "flashNext",
     "ffnKinds" : [
       "moe",

@@ -1,4 +1,4 @@
-"""Long prompt for the toy models: the wrapper of toyPrompts (Sources/lab-dev/Toy/ToyModels.swift: user
+"""Long prompt for the toy models: the wrapper of toyPrompts (Sources/ingot-dev/Toy/ToyModels.swift: user
 header, body, tail with <think>) tokenized with a toy's tokenizer.json (the same in all of them), with the three
 ref/agent_dump/*.json concatenated as the body (0008 first, so the prefix is the one of the 4K prompt). Writes
 out/prompts-toy-long/<name>.json ({"ids": [...]}), outside prompts-toy so the toys and toy-shapes do not change.
@@ -6,7 +6,7 @@ out/prompts-toy-long/<name>.json ({"ids": [...]}), outside prompts-toy so the to
 --check rebuilds 512 and 4K from 0008 alone and compares them with out/prompts-toy (same tokenizer and wrapper).
 
 Usage:
-  .venv/bin/python toy_long_prompt.py --toy ~/.cache/metal-lab/toy/toy-granite --tokens 15989 --name 16K [--check]
+  .venv/bin/python toy_long_prompt.py --toy ~/.cache/ingot/toy/toy-granite --tokens 15989 --name 16K [--check]
 """
 import argparse
 import json
@@ -21,7 +21,7 @@ DUMPS = ("0008-body.json", "0001-body.json", "0015-body.json")
 
 
 def encoder(path: str):
-    """Text -> ids. The special tokens take the ids that tokenizer.json declares in added_tokens, as the lab's
+    """Text -> ids. The special tokens take the ids that tokenizer.json declares in added_tokens, as ingot's
     BPETokenizer does: the toy vocabulary is cut and the tokenizers library renumbers added tokens that overlap it."""
     tok = Tokenizer.from_file(path)
     special = {a["content"]: a["id"] for a in json.load(open(path))["added_tokens"]}

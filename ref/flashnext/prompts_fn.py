@@ -1,4 +1,4 @@
-"""Benchmark prompts (as in ref/prompts.py) with the Flash-Next chat template, for lab-dev gen.
+"""Benchmark prompts (as in ref/prompts.py) with the Flash-Next chat template, for ingot-dev gen.
 
 The Flash-Next template (chat_template.jinja) adds a system message with the reasoning instructions
 (reasoning_effort, xhigh by default) and opens the <think> block. It is written by hand (no transformers or jinja) for a

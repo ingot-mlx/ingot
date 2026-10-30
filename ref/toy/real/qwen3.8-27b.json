@@ -4,7 +4,7 @@
  ],
  "image_token_id": 248056,
  "language_model_only": false,
- "metal_lab_real": {
+ "ingot_real": {
   "note": "sin vision_config; quantization con las capas plegadas en layers.*",
   "source": "~/Models/Qwen3.8-27B-MLX-4bit-calib"
  },
