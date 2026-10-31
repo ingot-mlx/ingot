@@ -6,7 +6,7 @@ in the 0.x series (see "Versions and releases" in `docs/development.md`).
 
 ## [Unreleased]
 
-## [0.1.0]
+## [0.1.0] - 2026-10-31
 
 First tagged release; changes since the initial public release of 2026-10-30.
 
