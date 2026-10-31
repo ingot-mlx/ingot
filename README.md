@@ -17,22 +17,22 @@ chip, the OS version and what is missing. `INGOT_SKIP_CHECK=1` skips it (diagnos
 
 ## Quick start
 
-There is no installer: build from source. The binaries end up in `.build/release/`.
+Install with Homebrew (a bottle; without one it builds with Xcode, about 30 s) or build from source (the binaries
+end up in `.build/release/`: use `.build/release/ingot` below):
 
 ```sh
-git clone https://github.com/ingot-mlx/ingot && cd ingot
+brew install ingot-mlx/tap/ingot            # ingot and ingot-dev on your PATH; brew upgrade ingot to update
+git clone https://github.com/ingot-mlx/ingot && cd ingot        # build from source instead of brew
 swift build -c release                      # .build/release/ingot (and ingot-dev); ingot --version: 0.1.0
-
 uv tool install huggingface_hub             # or: pip install -U huggingface_hub; gives the `hf` command
 hf download LiquidAI/LFM2.5-8B-A1B-MLX-4bit # 4.8 GB; goes to the Hugging Face cache
-
-.build/release/ingot serve --model LiquidAI/LFM2.5-8B-A1B-MLX-4bit    # 127.0.0.1:8090
+ingot serve --model LiquidAI/LFM2.5-8B-A1B-MLX-4bit    # 127.0.0.1:8090
 ```
 
 `ingot` never downloads anything: `--model` is a directory or an `org/repo` already in the Hugging Face cache
-(`HF_HUB_CACHE`, default `~/.cache/huggingface/hub`), and so is a family's default drafter (table of families): if it is
-missing, `ingot serve` and `ingot run` stop with the `hf download` line that gets it (or run with `--drafter none`). When the server prints its memory plan and starts listening, from
-another terminal:
+(`HF_HUB_CACHE`, default `~/.cache/huggingface/hub`), and so is a family's default drafter (table of families): if it
+is missing, `ingot serve` and `ingot run` stop with the `hf download` line that gets it (or run with `--drafter none`).
+When the server prints its memory plan and starts listening, from another terminal:
 
 ```sh
 curl -s http://127.0.0.1:8090/v1/chat/completions -H 'Content-Type: application/json' -d '{
@@ -41,8 +41,8 @@ curl -s http://127.0.0.1:8090/v1/chat/completions -H 'Content-Type: application/
 }'
 ```
 
-`GET /health` and `GET /v1/models` are there too. Stop the server with Ctrl-C. For another model, see the next section;
-the families the engine runs are in [Supported models](#supported-models).
+`GET /health` and `GET /v1/models` are there too; Ctrl-C stops the server. More models: next section and
+[Supported models](#supported-models).
 
 ## Which model for my Mac
 
