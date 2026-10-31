@@ -6,6 +6,11 @@ in the 0.x series (see "Versions and releases" in `docs/development.md`).
 
 ## [Unreleased]
 
+### Added
+
+- Install with Homebrew: `brew install ingot-mlx/tap/ingot` (tap `ingot-mlx/homebrew-tap`, with a bottle for Apple
+  silicon on macOS 27); `brew upgrade ingot` updates it. Building from source still works.
+
 ## [0.1.0] - 2026-10-31
 
 First tagged release; changes since the initial public release of 2026-10-30.
