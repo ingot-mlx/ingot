@@ -49,6 +49,8 @@ public final class MappedFile: @unchecked Sendable {
     public let base: UnsafeMutableRawPointer
     public let fileSize: Int
     public let mappedLength: Int
+    /// Read-only descriptor with F_NOCACHE, open as long as the file is (`deviceTensor`).
+    let readFD: Int32
 
     public init(path: String) throws {
         self.path = path
@@ -65,9 +67,20 @@ public final class MappedFile: @unchecked Sendable {
             throw SafetensorsError.io("mmap \(path)")
         }
         base = p
+        // Second descriptor for `deviceTensor`: pread without the page cache (F_NOCACHE), so loading the weights
+        // neither leaves another copy of the model in the cache nor pushes other pages out to compression or swap.
+        readFD = open(path, O_RDONLY)
+        guard readFD >= 0 else {
+            munmap(p, mappedLength)
+            throw SafetensorsError.io("cannot open \(path)")
+        }
+        _ = fcntl(readFD, F_NOCACHE, 1)
     }
 
-    deinit { munmap(base, mappedLength) }
+    deinit {
+        munmap(base, mappedLength)
+        close(readFD)
+    }
 }
 
 /// Safetensors loader (one or several shards with `model.safetensors.index.json`).
@@ -147,16 +160,54 @@ public struct DeviceTensor {
 }
 
 extension SafetensorsStore {
-    /// Copies the tensor into a new page-aligned shared `MTLBuffer`.
+    /// Reads the tensor into a new page-aligned shared `MTLBuffer` with `pread` on the shard's F_NOCACHE descriptor
+    /// (not through the mmap and the page cache). The reads are 16 KiB-aligned, into a staging buffer of up to 4 MiB:
+    /// F_NOCACHE only skips the cache entirely with aligned reads (ExpertStream.swift).
     public func deviceTensor(_ name: String, device: MTLDevice) throws -> DeviceTensor {
         let t = try info(name)
-        let src = bytes(t)
         guard let buf = device.makeBuffer(length: max(t.byteCount, 16), options: .storageModeShared) else {
             throw SafetensorsError.io("makeBuffer(length:) failed for \(name)")
         }
-        buf.contents().copyMemory(from: src.baseAddress!, byteCount: t.byteCount)
+        try readAligned(t, into: buf.contents())
         residency?.add(buf)
         return DeviceTensor(info: t, buffer: buf, offset: 0)
+    }
+}
+
+extension SafetensorsStore {
+    static let readAlignment = 16_384, readStaging = 4 << 20
+
+    /// Copies the tensor's bytes to `dst` with aligned `pread`s (retrying on EINTR) on the shard's F_NOCACHE
+    /// descriptor, through a staging buffer.
+    func readAligned(_ t: TensorInfo, into dst: UnsafeMutableRawPointer) throws {
+        let al = Self.readAlignment, fd = files[t.shard].readFD
+        let end = t.fileOffset + t.byteCount
+        var pos = t.fileOffset & ~(al - 1)
+        let stageBytes = min(Self.readStaging, (end - pos + al - 1) & ~(al - 1))
+        let stage = UnsafeMutableRawPointer.allocate(byteCount: stageBytes, alignment: al)
+        defer { stage.deallocate() }
+        while pos < end {
+            let want = min(stageBytes, (end - pos + al - 1) & ~(al - 1))
+            var got = 0
+            while got < want {
+                let n = pread(fd, stage + got, want - got, off_t(pos + got))
+                if n > 0 {
+                    got += n
+                } else if n < 0 && errno == EINTR {
+                    continue
+                } else if n == 0 {
+                    break  // end of file inside the last aligned block
+                } else {
+                    throw SafetensorsError.io("pread \(t.name): \(String(cString: strerror(errno)))")
+                }
+            }
+            let lo = max(pos, t.fileOffset), hi = min(pos + got, end)
+            guard hi == min(pos + want, end) else {
+                throw SafetensorsError.io("pread \(t.name): unexpected end of file")
+            }
+            (dst + (lo - t.fileOffset)).copyMemory(from: stage + (lo - pos), byteCount: hi - lo)
+            pos += want
+        }
     }
 }
 
