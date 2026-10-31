@@ -35,7 +35,8 @@ public final class ChatServer: @unchecked Sendable {
     public func handle(_ req: HTTPRequest, _ conn: HTTPConnection) {
         switch (req.method, req.path) {
         case ("GET", "/health"), ("GET", "/v1/health"):
-            conn.respond(200, json: #"{"status":"ok"}"#)
+            let health = JSONValue.object([("status", .string("ok")), ("version", .string(IngotVersion.current))])
+            conn.respond(200, json: health.compact())
         case ("GET", "/v1/models"), ("GET", "/models"):
             let m = JSONValue.object([
                 ("id", .string(modelId)), ("object", .string("model")), ("created", .int(created)),

@@ -2,6 +2,7 @@
 # Regenerate: scripts/api_surface.py   (check: scripts/api_surface.py --check)
 
 ## ingot: subcommands
+  --version
   info
   plan
   run
@@ -28,6 +29,7 @@
   --top-p  [value]
 
 ## ingot-dev: subcommands
+  --version
   batchcheck
   fncheck
   fnprof

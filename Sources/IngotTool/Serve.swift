@@ -19,13 +19,14 @@ import Metal
     let port = UInt16(args.int("port", 8090))
     let host = args.str("host", "127.0.0.1")
     let (dir, cfg, ctx) = try loadModelFiles(model)
+    // First line of the log: the version, then the memory plan (with the context) and the rest of the loading.
+    print("ingot \(IngotVersion.current): loading \(model)...")
     // Context, drafter, snapshots, prefix cache and prefill chunk: whatever the user sets and the rest according to
     // the Mac's memory (MemPlan.swift; --mem-limit-gb simulates another Mac). If not even the minimum fits, it is not loaded.
     let plan = try memoryPlan(dir: dir, cfg: cfg, device: ctx.device, options: memOptions(), loading: true)
     let useDrafter = plan.drafter
     let maxCtx = plan.context
     let t0 = Date()
-    print("loading \(model) (max context \(maxCtx) tokens)...")
     let info = try ChatModelInfo(directory: dir)
     if let w = info.dialect.warning { print("warning: \(w)") }
     let m = try HybridModel(

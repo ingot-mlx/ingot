@@ -69,6 +69,30 @@ TOY_WRITE_GOLDEN=1 scripts/ci.sh --toy                                          
 
 On another Mac, write your own real goldens: they only match with the same weights, prompt files and hardware.
 
+## Versions and releases
+
+ingot follows [Semantic Versioning](https://semver.org/) in the 0.x series; tags are `vX.Y.Z`, and the number without
+the `v` lives in `Sources/Ingot/Version.swift` (`IngotVersion.current`, printed by `ingot --version`, `GET /health` and
+the first line of `ingot serve`). Between releases, main reports the last release.
+
+- **0.MINOR.0**: anything that breaks a user of the previous version: removing or renaming a line of
+  `ref/api-surface.txt` (subcommand, option, HTTP field, `EngineOptions` field), changing tokens on purpose (goldens
+  rewritten), an incompatible change of a file format or cache, dropping a family or raising a requirement. Also a
+  large addition, such as a new family.
+- **0.x.PATCH**: fixes and additions that break nothing.
+- The objective sign of a break is the diff of `ref/api-surface.txt` since the last tag.
+- 1.0.0 comes when the CLI and the HTTP API are considered stable.
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/): every change a user notices (CLI, HTTP,
+formats, families, requirements, speed figures in the README) gets an entry under `## [Unreleased]` in the same
+branch. A release is a normal pull request that bumps `IngotVersion.current` and turns `[Unreleased]` into
+`## [X.Y.Z] - YYYY-MM-DD` with an empty `[Unreleased]` above it and the comparison links at the end; the signed tag
+`vX.Y.Z` and the GitHub release, with that section as its notes, come after it is merged. `VersionTests` fails if the
+version is not SemVer or has no section in the changelog.
+
+To depend on the `Ingot` library with SwiftPM in 0.x, use `.upToNextMinor(from: "0.1.0")`: `from:` also accepts 0.2.0,
+which may break.
+
 ## References (`ref/`)
 
 Tokenized prompts and mlx-lm references come from the Python scripts in `ref/` (their output, `ref/out/`, is not

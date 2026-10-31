@@ -21,7 +21,7 @@ There is no installer: build from source. The binaries end up in `.build/release
 
 ```sh
 git clone https://github.com/ingot-mlx/ingot && cd ingot
-swift build -c release                      # builds .build/release/ingot (and ingot-dev, for development)
+swift build -c release                      # .build/release/ingot (and ingot-dev); ingot --version: 0.1.0
 
 uv tool install huggingface_hub             # or: pip install -U huggingface_hub; gives the `hf` command
 hf download LiquidAI/LFM2.5-8B-A1B-MLX-4bit # 4.8 GB; goes to the Hugging Face cache
