@@ -15,6 +15,8 @@ import Metal
 /// agent sessions, where the client asks for it when it starts the server.
 /// One model per process with its DFlash2 drafter (LFM2.5, no drafter); OpenAI-compatible API (IngotServe).
 @MainActor func cmdServe() throws {
+    // "ready in" counts from here: the Metal context (kernel library) and the memory plan included.
+    let t0 = Date()
     let model = try args.required("model", modelHelp)
     let port = UInt16(args.int("port", 8090))
     let host = args.str("host", "127.0.0.1")
@@ -26,7 +28,6 @@ import Metal
     let plan = try memoryPlan(dir: dir, cfg: cfg, device: ctx.device, options: memOptions(), loading: true)
     let useDrafter = plan.drafter
     let maxCtx = plan.context
-    let t0 = Date()
     let info = try ChatModelInfo(directory: dir)
     if let w = info.dialect.warning { print("warning: \(w)") }
     let m = try HybridModel(

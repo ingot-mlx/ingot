@@ -75,6 +75,8 @@ public final class SafetensorsStore: @unchecked Sendable {
     public let directory: URL
     public let files: [MappedFile]
     public private(set) var tensors: [String: TensorInfo] = [:]
+    /// While a model loads, the buffers `deviceTensor` writes go here (WeightResidency).
+    var residency: WeightResidency?
 
     public init(directory: URL) throws {
         self.directory = directory
@@ -153,6 +155,7 @@ extension SafetensorsStore {
             throw SafetensorsError.io("makeBuffer(length:) failed for \(name)")
         }
         buf.contents().copyMemory(from: src.baseAddress!, byteCount: t.byteCount)
+        residency?.add(buf)
         return DeviceTensor(info: t, buffer: buf, offset: 0)
     }
 }
