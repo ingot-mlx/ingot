@@ -11,6 +11,7 @@ runCommand {
     case "info": try cmdInfo()
     case "plan": try cmdPlan()
     case "run": try cmdRun()
+    case "--version": print("ingot \(IngotVersion.current)")
     default:
         print(
             """
@@ -20,6 +21,7 @@ runCommand {
               plan    [--model org/repo|dir] [--mem-limit-gb N]   memory plan without loading the model
                       (without --model: every model in $INGOT_MODELS)
               info    --model org/repo|dir   model files, config and quantization
+              --version   prints the version
             engine options: --int8 0|1 --qk8 0|1 --copy auto|on|off --exp key=value
             on all commands: --pipelines FILE   appends the requested kernels to the file
             correctness checks and benchmarks: ingot-dev

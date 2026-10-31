@@ -28,6 +28,7 @@ let usage = """
       kl           [--ref exact|mlx|mlx-f32|mlx-prefix]   KL against the exact path (default) or mlx-lm
     maintenance:
       rowscal      [--pdir prompts-es] [--n 256] [--cost-prompts 512,4K,16K,32K] [--out f]   row calibration
+    --version      prints the version
     engine options: --int8 --qk8 --copy --tree N --spec-rows N --prep-trace --exp key=value
     in all: --pipelines FILE   appends to the file the kernels the command asked for
     """
@@ -55,6 +56,7 @@ runCommand {
         }
     // Maintenance
     case "rowscal": try cmdRowsCal()
+    case "--version": print("ingot-dev \(IngotVersion.current)")
     default:
         print(usage)
         if args.cmd != "help" && args.cmd != "--help" { exit(2) }

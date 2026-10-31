@@ -1,8 +1,14 @@
 # Changelog
 
-Changes since the initial public release, newest first. There are no tagged releases yet.
+All notable changes to ingot, newest first. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and ingot follows [Semantic Versioning](https://semver.org/)
+in the 0.x series (see "Versions and releases" in `docs/development.md`).
 
-## Unreleased
+## [Unreleased]
+
+## [0.1.0]
+
+First tagged release; changes since the initial public release of 2026-10-30.
 
 ### Changed
 
@@ -17,4 +23,9 @@ Changes since the initial public release, newest first. There are no tagged rele
 
 ### Added
 
+- `ingot --version` and `ingot-dev --version`; `GET /health` returns the version (`{"status":"ok","version":"0.1.0"}`)
+  and `ingot serve` prints it on its first line.
 - DFlash v1 drafters with head 64, q/k/v/o biases and YaRN, used by gpt-oss 20b.
+
+[Unreleased]: https://github.com/ingot-mlx/ingot/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ingot-mlx/ingot/releases/tag/v0.1.0
