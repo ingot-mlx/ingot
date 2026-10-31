@@ -17,17 +17,17 @@ chip, the OS version and what is missing. `INGOT_SKIP_CHECK=1` skips it (diagnos
 
 ## Quick start
 
-Install with Homebrew (a bottle; without one it builds with Xcode, about 30 s) or build from source (the binaries
-end up in `.build/release/`: use `.build/release/ingot` below):
+Install with Homebrew (a prebuilt bottle; `brew upgrade ingot` updates it), then fetch a model and serve it:
 
 ```sh
-brew install ingot-mlx/tap/ingot            # ingot and ingot-dev on your PATH; brew upgrade ingot to update
-git clone https://github.com/ingot-mlx/ingot && cd ingot        # build from source instead of brew
-swift build -c release                      # .build/release/ingot (and ingot-dev); ingot --version: 0.1.0
+brew install ingot-mlx/tap/ingot            # ingot --version: 0.1.0
 uv tool install huggingface_hub             # or: pip install -U huggingface_hub; gives the `hf` command
 hf download LiquidAI/LFM2.5-8B-A1B-MLX-4bit # 4.8 GB; goes to the Hugging Face cache
 ingot serve --model LiquidAI/LFM2.5-8B-A1B-MLX-4bit    # 127.0.0.1:8090
 ```
+
+From source instead (also builds `ingot-dev`): `git clone https://github.com/ingot-mlx/ingot && cd ingot && swift
+build -c release`, and use `.build/release/ingot` above.
 
 `ingot` never downloads anything: `--model` is a directory or an `org/repo` already in the Hugging Face cache
 (`HF_HUB_CACHE`, default `~/.cache/huggingface/hub`), and so is a family's default drafter (table of families): if it
