@@ -6,6 +6,8 @@ in the 0.x series (see "Versions and releases" in `docs/development.md`).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-01
+
 ### Changed
 
 - `ingot serve` starts much faster with large models: weights are made resident while loading and read with
@@ -38,5 +40,6 @@ First tagged release; changes since the initial public release of 2026-10-30.
   and `ingot serve` prints it on its first line.
 - DFlash v1 drafters with head 64, q/k/v/o biases and YaRN, used by gpt-oss 20b.
 
-[Unreleased]: https://github.com/ingot-mlx/ingot/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ingot-mlx/ingot/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/ingot-mlx/ingot/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ingot-mlx/ingot/releases/tag/v0.1.0
