@@ -172,4 +172,25 @@ struct FormatTests {
             try DenseQ(store: st, config: cfg, paths: ["l"], device: MTLCreateSystemDefaultDevice()!)
         }
     }
+
+    /// `deviceTensor` reads with pread on an F_NOCACHE descriptor: byte for byte what the mmap holds, with unaligned
+    /// offsets (odd header) and sizes that are not a multiple of 16 KiB, one longer than the 4 MiB staging buffer and
+    /// the last one ending at the end of the file (inside an aligned block).
+    @Test func deviceTensorMatchesMappedBytes() throws {
+        let dir = try tmpDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        func bytes(_ n: Int, _ k: Int) -> Data { Data((0..<n).map { UInt8(truncatingIfNeeded: $0 &* k &+ n) }) }
+        let sizes = [("a", 1), ("big", 70_001), ("c", 12_345), ("d", 16_384 + 3), ("e", (4 << 20) + 12_345)]
+        try writeSafetensors(dir, tensors: sizes.map { ($0.0, "U8", [$0.1], bytes($0.1, 31)) })
+        let st = try SafetensorsStore(directory: dir)
+        let dev = try #require(MTLCreateSystemDefaultDevice())
+        for (name, n) in sizes {
+            let t = try st.info(name)
+            let d = try st.deviceTensor(name, device: dev)
+            #expect(d.buffer.length >= n && d.offset == 0)
+            let got = UnsafeRawBufferPointer(start: d.buffer.contents(), count: n)
+            #expect(got.elementsEqual(st.bytes(t)), "\(name)")
+        }
+        #expect(try st.alignment(st.info("a")) < 4 && st.alignment(st.info("c")) < 4)  // deliberately misaligned
+    }
 }

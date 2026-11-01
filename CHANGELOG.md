@@ -6,6 +6,12 @@ in the 0.x series (see "Versions and releases" in `docs/development.md`).
 
 ## [Unreleased]
 
+### Changed
+
+- `ingot serve` starts much faster with large models: weights are made resident while loading and read with
+  aligned `pread` that bypasses the page cache. Qwen3.6 35B-A3B (4-bit) is ready in 7.3 s instead of 26.7 s on an
+  M6 Mac mini with 32 GB, with the same tokens and the same memory. "ready in" now counts from the start of `serve`.
+
 ### Added
 
 - Install with Homebrew: `brew install ingot-mlx/tap/ingot` (tap `ingot-mlx/homebrew-tap`, with a bottle for Apple

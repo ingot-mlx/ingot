@@ -45,6 +45,9 @@ public final class HybridModel {
     }
 
     public let ctx: MetalContext
+    /// Residency set of the weights `deviceTensor` loaded: requested during the load, attached to the queue at its end
+    /// and detached in `deinit`, so it lives as long as the model.
+    let weightResidency: WeightResidency
     /// Context of the full attention layers when their shape differs from the model's (ModelSpec.fullShape); nil
     /// otherwise.
     public let fullCtx: MetalContext?
@@ -170,6 +173,8 @@ public final class HybridModel {
         let t0 = Date()
         self.ctx = ctx
         self.options = options
+        weightResidency = try WeightResidency(device: ctx.device, loading: store)
+        defer { store.residency = nil }
         rowsConfig = try SpecRowsConfig.load(modelDirectory: store.directory, config: cfg)
         self.cfg = cfg
         let sp = try cfg.requiredSpec
@@ -328,8 +333,11 @@ public final class HybridModel {
         } else {
             pff = nil
         }
+        weightResidency.finishLoad(queue: ctx.queue)
         loadSeconds = Date().timeIntervalSince(t0)
     }
+
+    deinit { weightResidency.detach() }
 
     /// FFN of layer `i` by its FFNKind: the MoE (with its weights for PrefillMoE), the dense MLP, both (Gemma 4 26B-A4B,
     /// with the norms of the parallel FFN), or none (FFNKind.none).
