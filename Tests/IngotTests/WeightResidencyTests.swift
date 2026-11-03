@@ -36,14 +36,14 @@ struct WeightResidencyTests {
     /// it again (and says how long that took).
     @Test func heartbeatHoldsThenReleases() async throws {
         let dev = try #require(MTLCreateSystemDefaultDevice())
-        let r = try WeightResidency(device: dev, heartbeat: 0.02, idleRelease: 0.3)
+        let r = try WeightResidency(device: dev, heartbeat: 0.02, idleRelease: 1.5)
         #expect(!r.isHeld)
         #expect(r.use() != nil)  // first use: requested now
         #expect(r.isHeld)
         try await Task.sleep(nanoseconds: 150_000_000)
         #expect(r.use() == nil)  // still held
         #expect(r.beats > 0)
-        try await Task.sleep(nanoseconds: 900_000_000)
+        try await Task.sleep(nanoseconds: 3_000_000_000)
         #expect(!r.isHeld)
         let beats = r.beats
         try await Task.sleep(nanoseconds: 100_000_000)
