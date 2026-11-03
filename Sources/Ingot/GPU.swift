@@ -122,8 +122,13 @@ public final class MetalContext: @unchecked Sendable {
     nonisolated(unsafe) private static var used: Set<String> = []
     private static let usedLock = NSLock()
 
+    /// While a model or its drafter loads, every buffer made here is handed to it (`WeightResidency.capturing`).
+    var onBuffer: ((MTLBuffer) -> Void)?
+
     public func buffer(length: Int) -> MTLBuffer {
-        device.makeBuffer(length: max(length, 16), options: .storageModeShared)!
+        let b = device.makeBuffer(length: max(length, 16), options: .storageModeShared)!
+        onBuffer?(b)
+        return b
     }
 
     /// A buffer of `length` bytes (at least 16, as `buffer(length:)`) whose first `length` bytes are set to zero.
@@ -134,9 +139,11 @@ public final class MetalContext: @unchecked Sendable {
     }
 
     public func buffer<T>(_ a: [T]) -> MTLBuffer {
-        a.withUnsafeBytes {
+        let b = a.withUnsafeBytes {
             device.makeBuffer(bytes: $0.baseAddress!, length: max($0.count, 16), options: .storageModeShared)!
         }
+        onBuffer?(b)
+        return b
     }
 
     /// Runs a command buffer and returns (GPU ms, wall ms).

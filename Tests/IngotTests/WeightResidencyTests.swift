@@ -72,4 +72,22 @@ struct WeightResidencyTests {
         #expect(gone == nil)
         r.detach()
     }
+
+    /// Buffers made while loading stay in the state set, except those the engine passes the first time (the KV),
+    /// which then follow the engine.
+    @Test func loadBuffersStay() throws {
+        let dev = try #require(MTLCreateSystemDefaultDevice())
+        let r = try WeightResidency(device: dev)
+        func buf() throws -> MTLBuffer { try #require(dev.makeBuffer(length: 1024, options: .storageModeShared)) }
+        let work = try buf(), kv = try buf(), kv2 = try buf()
+        r.keep(work)
+        r.keep(kv)
+        r.setStateBuffers([kv])
+        #expect(r.stateSet.allocationCount == 2)
+        r.setStateBuffers([kv2])  // the KV reallocated
+        #expect(r.stateSet.allocationCount == 2)
+        #expect(r.stateSet.containsAllocation(work) && r.stateSet.containsAllocation(kv2))
+        #expect(!r.stateSet.containsAllocation(kv))
+        r.detach()
+    }
 }

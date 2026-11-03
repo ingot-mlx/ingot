@@ -8,10 +8,12 @@ import Metal
 /// command queue, and detached when the model goes away. Without it the first command buffer waits for the system to
 /// wire every weight buffer, which by then it has often compressed or swapped out (~13 s with the Qwen3.6 MoE).
 ///
-/// State: the attention KV, the recurrent state, the snapshots and the prefix cache entries go in a second set
-/// (`stateSet`), kept in step with the engine by `setStateBuffers` and never attached to the queue: its members change
-/// between requests (a commit on a set the queue holds would touch every command buffer after it), and every command
-/// buffer already makes resident the state it binds. It is there only so the heartbeat keeps it wired while idle.
+/// State: everything else the model and its drafter use goes in a second set (`stateSet`), never attached to the queue:
+/// its members change between requests (a commit on a set the queue holds would touch every command buffer after it),
+/// and every command buffer already makes resident what it binds. It is there only so the heartbeat keeps it wired
+/// while idle. Its members are the buffers made while the model and the drafter load (work buffers, the drafter's
+/// weights; `keep`), and the attention KV, the recurrent state, the snapshots and the prefix cache entries, which
+/// follow the engine (`setStateBuffers`).
 ///
 /// Heartbeat: a standing request does not last. Once the GPU goes idle the system drops the residency within seconds
 /// and, after minutes, compresses the weights: the first command buffer of the next request then waits for the whole
@@ -19,7 +21,7 @@ import Metal
 /// 1.6 s after 5 min idle). So, while there was a request (or the load) in the last `idleRelease` seconds, both
 /// sets' residency is requested again every `heartbeat` seconds; after that the residency is ended, which gives the
 /// memory back to the system, and the next request requests it again before it starts (paying the rewiring once).
-final class WeightResidency: @unchecked Sendable {
+package final class WeightResidency: @unchecked Sendable {
     let set: MTLResidencySet
     /// Conversation state (KV, recurrent state, snapshots, prefix cache entries); not attached to the queue.
     let stateSet: MTLResidencySet
@@ -42,16 +44,32 @@ final class WeightResidency: @unchecked Sendable {
     /// Guards `stateSet` (its members change on the engine's thread, the heartbeat requests it on `queue`).
     private let stateLock = NSLock()
     private var stateMembers: [ObjectIdentifier: MTLBuffer] = [:]
+    /// Buffers made while loading (`keep`), less those the engine passes to `setStateBuffers` the first time (they
+    /// follow the engine: the KV can be reallocated).
+    private var loadMembers: [ObjectIdentifier: MTLBuffer] = [:]
+    private var loadSettled = false
+    private var loading: (store: SafetensorsStore?, context: MetalContext?) = (nil, nil)
 
-    /// `loading`: the store whose `deviceTensor` buffers join the set until it clears `residency`.
+    /// `loading`: the store whose `deviceTensor` buffers join the set, and `context`: the context whose buffers join
+    /// `stateSet` (`keep`), until `endLoad`.
     init(
-        device: MTLDevice, loading store: SafetensorsStore? = nil, heartbeat: Double = 0.5, idleRelease: Double = 600
+        device: MTLDevice, loading store: SafetensorsStore? = nil, context: MetalContext? = nil,
+        heartbeat: Double = 0.5, idleRelease: Double = 600
     ) throws {
         set = try device.makeResidencySet(descriptor: MTLResidencySetDescriptor())
         stateSet = try device.makeResidencySet(descriptor: MTLResidencySetDescriptor())
         self.heartbeat = heartbeat
         self.idleRelease = idleRelease
         store?.residency = self
+        context?.onBuffer = { [unowned self] in keep($0) }
+        loading = (store, context)
+    }
+
+    /// The load ended (or failed): the store and the context stop handing their buffers over.
+    func endLoad() {
+        loading.store?.residency = nil
+        loading.context?.onBuffer = nil
+        loading = (nil, nil)
     }
 
     /// Whether the heartbeat is running (the residency is held).
@@ -147,14 +165,31 @@ final class WeightResidency: @unchecked Sendable {
         lock.withLock { beatCount += 1 }
     }
 
-    /// Makes `buffers` the members of `stateSet` (by identity; one commit, only when something changed). The set holds
-    /// its members alive, so a buffer the engine dropped is freed once it leaves here: called on the engine's thread
-    /// after the state changes (once or twice per request, never per token).
+    /// A buffer made while loading: it joins `stateSet` at the next `setStateBuffers`, for the model's lifetime.
+    func keep(_ buffer: MTLBuffer) {
+        stateLock.withLock { loadMembers[ObjectIdentifier(buffer)] = buffer }
+    }
+
+    /// Runs `body` (a drafter loading) with the buffers `ctx` makes going to `keep`.
+    package func capturing<T>(_ ctx: MetalContext, _ body: () throws -> T) rethrows -> T {
+        ctx.onBuffer = { [self] in keep($0) }
+        defer { ctx.onBuffer = nil }
+        return try body()
+    }
+
+    /// Makes the buffers made while loading and `buffers` the members of `stateSet` (by identity; one commit, only when
+    /// something changed). The set holds its members alive, so a buffer the engine dropped is freed once it leaves
+    /// here: called on the engine's thread after the state changes (once or twice per request, never per token).
     func setStateBuffers(_ buffers: [MTLBuffer]) {
         var next: [ObjectIdentifier: MTLBuffer] = [:]
         next.reserveCapacity(buffers.count)
         for b in buffers { next[ObjectIdentifier(b)] = b }
         stateLock.withLock {
+            if !loadSettled {
+                for k in next.keys { loadMembers[k] = nil }
+                loadSettled = true
+            }
+            next.merge(loadMembers) { a, _ in a }
             var changed = false
             for (k, b) in stateMembers where next[k] == nil {
                 stateSet.removeAllocation(b)
@@ -187,6 +222,7 @@ extension InferenceEngine {
         }
         for s in snaps + spare + parkedCache.flatMap(\.snaps) { b += s.buffers }
         for e in entries { b += e.snap.buffers + [e.kv] }
+        for q in model.fn?.qsaList ?? [] { b.append(q.bk) }
         model.weightResidency.setStateBuffers(b)
     }
 }
