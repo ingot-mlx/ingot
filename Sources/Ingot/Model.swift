@@ -47,7 +47,7 @@ public final class HybridModel {
     public let ctx: MetalContext
     /// Residency set of the weights `deviceTensor` loaded: requested during the load, attached to the queue at its end
     /// and detached in `deinit`, so it lives as long as the model.
-    let weightResidency: WeightResidency
+    package let weightResidency: WeightResidency
     /// Context of the full attention layers when their shape differs from the model's (ModelSpec.fullShape); nil
     /// otherwise.
     public let fullCtx: MetalContext?
@@ -173,8 +173,9 @@ public final class HybridModel {
         let t0 = Date()
         self.ctx = ctx
         self.options = options
-        weightResidency = try WeightResidency(device: ctx.device, loading: store)
-        defer { store.residency = nil }
+        let residency = try WeightResidency(device: ctx.device, loading: store, context: ctx)
+        defer { residency.endLoad() }
+        weightResidency = residency
         rowsConfig = try SpecRowsConfig.load(modelDirectory: store.directory, config: cfg)
         self.cfg = cfg
         let sp = try cfg.requiredSpec

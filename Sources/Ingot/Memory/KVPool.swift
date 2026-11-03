@@ -28,6 +28,8 @@ public final class KVPool: @unchecked Sendable {
     /// Bytes per position across all regions.
     public internal(set) var bytesPerPosition = 0
     public private(set) var grows = 0, shrinks = 0
+    /// Called after each reallocation (the engine drops the old buffers from its state residency set).
+    var onResize: (() -> Void)?
     /// Positions the plan counts; whatever exceeds that is yielded by the prefix cache and the snapshots.
     public let allowance: Int
 
@@ -86,6 +88,7 @@ public final class KVPool: @unchecked Sendable {
         cb.waitUntilCompleted()
         for r in resizers { r(cap) }
         capacity = cap
+        onResize?()
     }
 
     public func describe() -> String {

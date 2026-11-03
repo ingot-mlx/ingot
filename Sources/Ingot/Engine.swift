@@ -77,7 +77,9 @@ public final class InferenceEngine {
     var liveAnswerStart = 0
     var snaps: [StateSnapshot] = []
     var spare: [StateSnapshot] = []
-    public var log: (@Sendable (String) -> Void)?
+    public var log: (@Sendable (String) -> Void)? {
+        didSet { model.weightResidency.log = log }
+    }
     /// Tests: called after reading the prompt with the `model.logits` row holding the logits of its last
     /// position.
     public var onPromptLogits: ((Int) -> Void)?
@@ -116,6 +118,8 @@ public final class InferenceEngine {
         self.maxSnapshots = maxSnapshots
         snapshotLimit = maxSnapshots
         self.prefixCacheBytes = prefixCacheBytes ?? 1_000_000_000
+        model.kvPool?.onResize = { [weak self] in self?.syncStateResidency() }
+        syncStateResidency()
     }
 
     /// KVPool: the KV beyond what the plan accounts for is paid first by the prefix cache (entries are evicted), then
@@ -142,6 +146,7 @@ public final class InferenceEngine {
             if spare.count > 2 { spare.removeFirst(spare.count - 2) }
         }
         snapshotLimit = limit
+        syncStateResidency()
     }
 
     public struct Result {
@@ -268,6 +273,10 @@ public final class InferenceEngine {
         guard prompt.count + DFlash2Drafter.margin(drafter) <= m.maxCtx else {
             throw EngineError.contextOverflow(prompt: prompt.count, maxCtx: m.maxCtx)
         }
+        // Before the first command buffer: a residency released after a long idle is requested again here, once.
+        if let ms = m.weightResidency.use() {
+            log?(String(format: "residency: requested again in %.1f ms", ms))
+        }
         var res = Result(stats: .init())
         res.promptTokens = prompt.count
         let n = prompt.count
@@ -387,6 +396,7 @@ public final class InferenceEngine {
         first = try m.sampleFromLogits(argmax: first, row: row, params: sampling, rng: &rng)
         live = prompt
         liveAnswerStart = n
+        syncStateResidency()  // snapshots and entries taken, evicted ones dropped
         return (res, first, rng)
     }
 
