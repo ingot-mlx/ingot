@@ -31,4 +31,45 @@ struct WeightResidencyTests {
         residency.detach()
         residency.detach()  // idempotent
     }
+
+    /// The heartbeat runs while used, ends the residency after `idleRelease` without use, and the next use requests
+    /// it again (and says how long that took).
+    @Test func heartbeatHoldsThenReleases() async throws {
+        let dev = try #require(MTLCreateSystemDefaultDevice())
+        let r = try WeightResidency(device: dev, heartbeat: 0.02, idleRelease: 0.3)
+        #expect(!r.isHeld)
+        #expect(r.use() != nil)  // first use: requested now
+        #expect(r.isHeld)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        #expect(r.use() == nil)  // still held
+        #expect(r.beats > 0)
+        try await Task.sleep(nanoseconds: 900_000_000)
+        #expect(!r.isHeld)
+        let beats = r.beats
+        try await Task.sleep(nanoseconds: 100_000_000)
+        #expect(r.beats == beats)  // stopped
+        #expect(r.use() != nil)  // requested again
+        #expect(r.isHeld)
+        r.detach()
+        #expect(!r.isHeld)
+    }
+
+    /// The state set follows the buffers it is given, and a buffer that leaves it is freed.
+    @Test func stateSetFollowsTheEngine() throws {
+        let dev = try #require(MTLCreateSystemDefaultDevice())
+        let r = try WeightResidency(device: dev)
+        let a = try #require(dev.makeBuffer(length: 1024, options: .storageModeShared))
+        weak var gone: MTLBuffer?
+        do {
+            let b = try #require(dev.makeBuffer(length: 1024, options: .storageModeShared))
+            gone = b
+            r.setStateBuffers([a, b, a])
+            #expect(r.stateSet.allocationCount == 2)
+        }
+        #expect(gone != nil)  // the set holds it
+        r.setStateBuffers([a])
+        #expect(r.stateSet.allocationCount == 1)
+        #expect(gone == nil)
+        r.detach()
+    }
 }
