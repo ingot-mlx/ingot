@@ -6,6 +6,16 @@ in the 0.x series (see "Versions and releases" in `docs/development.md`).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-03
+
+### Changed
+
+- `ingot serve` keeps the model's weights resident between requests: the first request after an idle pause no longer
+  waits for macOS to make them resident again. On an M6 Mac mini with Qwen3.6 35B-A3B (4-bit), time to first token
+  after 5 minutes idle drops from 1.64 s to 0.49 s, with the same decode speed. After 10 minutes without requests the
+  residency ends and the memory goes back to the system (about 22 GB with that model); the next request takes about
+  0.2 s more to make it resident again.
+
 ## [0.1.1] - 2026-11-01
 
 ### Changed
@@ -40,6 +50,7 @@ First tagged release; changes since the initial public release of 2026-10-30.
   and `ingot serve` prints it on its first line.
 - DFlash v1 drafters with head 64, q/k/v/o biases and YaRN, used by gpt-oss 20b.
 
-[Unreleased]: https://github.com/ingot-mlx/ingot/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/ingot-mlx/ingot/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/ingot-mlx/ingot/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/ingot-mlx/ingot/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/ingot-mlx/ingot/releases/tag/v0.1.0
