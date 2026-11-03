@@ -173,8 +173,9 @@ public final class HybridModel {
         let t0 = Date()
         self.ctx = ctx
         self.options = options
-        weightResidency = try WeightResidency(device: ctx.device, loading: store, context: ctx)
-        defer { weightResidency.endLoad() }
+        let residency = try WeightResidency(device: ctx.device, loading: store, context: ctx)
+        defer { residency.endLoad() }
+        weightResidency = residency
         rowsConfig = try SpecRowsConfig.load(modelDirectory: store.directory, config: cfg)
         self.cfg = cfg
         let sp = try cfg.requiredSpec
